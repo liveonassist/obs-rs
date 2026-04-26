@@ -28,7 +28,7 @@ jobs:
         with:
           submodules: true
 
-      - uses: dtolnay/rust-toolchain@1.85.0
+      - uses: dtolnay/rust-toolchain@1.95.0
         with:
           components: rustfmt
 
@@ -116,7 +116,7 @@ jobs:
         with:
           submodules: true
 
-      - uses: dtolnay/rust-toolchain@1.85.0
+      - uses: dtolnay/rust-toolchain@1.95.0
 
       - uses: Swatinem/rust-cache@v2
 
@@ -171,7 +171,7 @@ jobs:
         with:
           submodules: true
 
-      - uses: dtolnay/rust-toolchain@1.85.0
+      - uses: dtolnay/rust-toolchain@1.95.0
 
       - uses: Swatinem/rust-cache@v2
 

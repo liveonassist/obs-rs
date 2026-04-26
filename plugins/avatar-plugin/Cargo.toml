@@ -2,6 +2,7 @@
 name = "avatar-plugin"
 version = "0.2.0"
 edition = "2024"
+rust-version = "1.95.0"
 
 [dependencies]
 obs-wrapper = { path = "../..", default-features = false }

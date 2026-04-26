@@ -46,8 +46,9 @@
         pkgsObsV31 = importPinned nixpkgs-obs-v31;
         pkgsObsV32 = importPinned nixpkgs-master;
 
-        # Rust 2024 edition requires >= 1.85.
-        rustToolchain = pkgs.rust-bin.stable.latest.default.override {
+        # Pinned so the dev shell and CI agree exactly. Bump in lockstep with
+        # the dtolnay/rust-toolchain pin in .github/workflows/build.yml.
+        rustToolchain = pkgs.rust-bin.stable."1.95.0".default.override {
           extensions = [
             "rust-src"
             "rust-analyzer"
