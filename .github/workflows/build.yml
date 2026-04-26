@@ -112,13 +112,17 @@ jobs:
     runs-on: macos-latest
     env:
       DONT_USE_GENERATED_BINDINGS: "true"
-      OBS_LIBRARY_MAJOR_VER: ${{ matrix.obs }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
 
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
 
       - uses: Swatinem/rust-cache@v2
 
@@ -150,12 +154,20 @@ jobs:
           sudo cp -R "$app_path" /Applications/OBS.app
           hdiutil detach "$mount_dir"
 
-      - run: cargo build --verbose --workspace --exclude scroll-focus-filter --no-default-features --features obs-${{ matrix.obs }}
+      - name: build
+        run: |
+          nix develop .#obs-v${{ matrix.obs }} --command \
+            cargo build --verbose --workspace --exclude scroll-focus-filter \
+              --no-default-features --features obs-${{ matrix.obs }}
         env:
           DYLD_FALLBACK_FRAMEWORK_PATH: "/Applications/OBS.app/Contents/Frameworks"
           DYLD_FALLBACK_LIBRARY_PATH: "/Applications/OBS.app/Contents/Frameworks"
 
-      - run: cargo test --workspace --exclude scroll-focus-filter --exclude avatar-plugin --no-default-features --features obs-${{ matrix.obs }}
+      - name: test
+        run: |
+          nix develop .#obs-v${{ matrix.obs }} --command \
+            cargo test --workspace --exclude scroll-focus-filter --exclude avatar-plugin \
+              --no-default-features --features obs-${{ matrix.obs }}
         env:
           DYLD_FALLBACK_FRAMEWORK_PATH: "/Applications/OBS.app/Contents/Frameworks"
           DYLD_FALLBACK_LIBRARY_PATH: "/Applications/OBS.app/Contents/Frameworks"
