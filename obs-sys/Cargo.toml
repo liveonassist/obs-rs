@@ -1,12 +1,18 @@
 [package]
 name = "obs-sys"
-version = "0.3.1-tm"
+version = "0.4.0-tm"
 authors = ["Bennett Hardwick <me@bennetthardwick.com>"]
 edition = "2024"
 links = "obs"
 description = "Bindgen of <obs/obs.h>"
 license = "GPL-2.0"
 repository = "https://github.com/TakiMoysha/rust-obs-plugins"
+
+[features]
+default = ["obs-32"]
+obs-30 = []
+obs-31 = []
+obs-32 = []
 
 [build-dependencies]
 bindgen = "0.72"

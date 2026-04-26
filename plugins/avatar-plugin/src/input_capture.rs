@@ -1,8 +1,6 @@
-#[cfg(all(target_os = "linux", feature = "wayland"))]
-use std::os::unix::io::AsRawFd;
-
 /// Represents different types of input events
 #[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)] // public API; not all variants are constructed in every example/build
 pub enum InputEvent {
     /// Key press event with key code
     KeyPress(u32),
@@ -20,6 +18,7 @@ pub enum InputEvent {
 
 /// Error type for input capture operations
 #[derive(Debug, thiserror::Error)]
+#[allow(dead_code)] // public API; not all variants are constructed in every example/build
 pub enum InputCaptureError {
     #[error("Failed to initialize input capture: {0}")]
     InitError(String),
@@ -146,19 +145,17 @@ mod wayland {
             if let Ok(entries) = std::fs::read_dir(input_dir) {
                 for entry in entries.flatten() {
                     let path = entry.path();
-                    if let Some(fname) = path.file_name().and_then(|n| n.to_str()) {
-                        if fname.starts_with("event") {
-                            if let Ok(device) = Device::open(&path) {
-                                if is_keyboard(&device) {
-                                    println!(
-                                        "Found keyboard: {} ({})",
-                                        device.name().unwrap_or("Unknown"),
-                                        path.display()
-                                    );
-                                    keyboards.push(path);
-                                }
-                            }
-                        }
+                    if let Some(fname) = path.file_name().and_then(|n| n.to_str())
+                        && fname.starts_with("event")
+                        && let Ok(device) = Device::open(&path)
+                        && is_keyboard(&device)
+                    {
+                        println!(
+                            "Found keyboard: {} ({})",
+                            device.name().unwrap_or("Unknown"),
+                            path.display()
+                        );
+                        keyboards.push(path);
                     }
                 }
             }
@@ -230,7 +227,7 @@ mod wayland {
 
     fn is_keyboard(device: &Device) -> bool {
         // Check for presence of keys A, Z and ENTER
-        device.supported_keys().map_or(false, |keys| {
+        device.supported_keys().is_some_and(|keys| {
             keys.contains(KeyCode::KEY_A)
                 && keys.contains(KeyCode::KEY_Z)
                 && keys.contains(KeyCode::KEY_ENTER)

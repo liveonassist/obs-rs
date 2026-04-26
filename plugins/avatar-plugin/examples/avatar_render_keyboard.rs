@@ -209,9 +209,9 @@ async fn main() {
         .left_hand
         .as_ref()
         .map(|h| load_texture_from_image_data(&h.up_image));
-    
+
     // Load left hand key frames from the new structure (keycode -> texture)
-    let mut left_hand_key_frames: std::collections::HashMap<u32, Texture2D> = 
+    let mut left_hand_key_frames: std::collections::HashMap<u32, Texture2D> =
         std::collections::HashMap::new();
     for (&keycode, image_data) in &mode.left_hand_key_frames {
         left_hand_key_frames.insert(keycode, load_texture_from_image_data(image_data));
@@ -221,9 +221,9 @@ async fn main() {
         .right_hand
         .as_ref()
         .map(|h| load_texture_from_image_data(&h.up_image));
-    
+
     // Load right hand key frames from the new structure (keycode -> texture)
-    let mut right_hand_key_frames: std::collections::HashMap<u32, Texture2D> = 
+    let mut right_hand_key_frames: std::collections::HashMap<u32, Texture2D> =
         std::collections::HashMap::new();
     for (&keycode, image_data) in &mode.right_hand_key_frames {
         right_hand_key_frames.insert(keycode, load_texture_from_image_data(image_data));
@@ -279,7 +279,7 @@ async fn main() {
     };
 
     // Create layers
-    let layers = vec![
+    let layers = [
         Layer::new("background", background_tex, background_config),
         Layer::new("cat_body", cat_bg_tex, cat_config.clone()),
         Layer::new("face", face_tex, face_config),
@@ -307,6 +307,7 @@ async fn main() {
     let start_time = get_time();
 
     // Hand animation state
+    #[allow(unused_assignments)]
     let mut left_hand_state = HandState::Up;
     #[allow(unused_assignments)]
     let mut right_hand_state = HandState::Up;
@@ -335,7 +336,7 @@ async fn main() {
         let mut right_hand_pressed = false;
         let mut left_hand_pressed_key: Option<u32> = None;
         let mut right_hand_pressed_key: Option<u32> = None;
-        
+
         // Check if any pressed key has a corresponding hand frame
         for &key_code in &pressed_keys {
             // Check left hand
@@ -343,7 +344,7 @@ async fn main() {
                 left_hand_pressed = true;
                 left_hand_pressed_key = Some(key_code);
             }
-            
+
             // Check right hand
             if right_hand_key_frames.contains_key(&key_code) {
                 right_hand_pressed = true;
@@ -435,18 +436,18 @@ async fn main() {
         // Draw pressed keys images (before hands so hands are on top)
         for (key_str, tex) in &key_textures {
             // Try to parse key string as keycode
-            if let Ok(key_code) = key_str.parse::<u32>() {
-                if pressed_keys.contains(&key_code) {
-                    if enable_deformation {
-                        let renderer = DeformationRenderer::new(
-                            layers[1].config.clone(), // Use cat config for keys (they move with table)
-                            mouse_influence,
-                            current_time,
-                        );
-                        renderer.render(tex, Vec2::ZERO);
-                    } else {
-                        simple_renderer.render(tex, Vec2::ZERO);
-                    }
+            if let Ok(key_code) = key_str.parse::<u32>()
+                && pressed_keys.contains(&key_code)
+            {
+                if enable_deformation {
+                    let renderer = DeformationRenderer::new(
+                        layers[1].config.clone(), // Use cat config for keys (they move with table)
+                        mouse_influence,
+                        current_time,
+                    );
+                    renderer.render(tex, Vec2::ZERO);
+                } else {
+                    simple_renderer.render(tex, Vec2::ZERO);
                 }
             }
         }

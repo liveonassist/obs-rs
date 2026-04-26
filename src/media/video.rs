@@ -1,9 +1,9 @@
 use obs_sys::{
     obs_source_frame, video_data, video_format, video_format_VIDEO_FORMAT_AYUV,
     video_format_VIDEO_FORMAT_BGR3, video_format_VIDEO_FORMAT_BGRA, video_format_VIDEO_FORMAT_BGRX,
-    video_format_VIDEO_FORMAT_I010, video_format_VIDEO_FORMAT_I210, video_format_VIDEO_FORMAT_I40A,
-    video_format_VIDEO_FORMAT_I412, video_format_VIDEO_FORMAT_I420, video_format_VIDEO_FORMAT_I422,
-    video_format_VIDEO_FORMAT_I42A, video_format_VIDEO_FORMAT_I444, video_format_VIDEO_FORMAT_NONE,
+    video_format_VIDEO_FORMAT_I010, video_format_VIDEO_FORMAT_I40A, video_format_VIDEO_FORMAT_I42A,
+    video_format_VIDEO_FORMAT_I210, video_format_VIDEO_FORMAT_I412, video_format_VIDEO_FORMAT_I420,
+    video_format_VIDEO_FORMAT_I422, video_format_VIDEO_FORMAT_I444, video_format_VIDEO_FORMAT_NONE,
     video_format_VIDEO_FORMAT_NV12, video_format_VIDEO_FORMAT_P010, video_format_VIDEO_FORMAT_RGBA,
     video_format_VIDEO_FORMAT_UYVY, video_format_VIDEO_FORMAT_Y800, video_format_VIDEO_FORMAT_YA2L,
     video_format_VIDEO_FORMAT_YUVA, video_format_VIDEO_FORMAT_YUY2, video_format_VIDEO_FORMAT_YVYU,
@@ -145,8 +145,8 @@ impl VideoInfo {
         use VideoFormat::*;
         let width = self.width as usize;
         let height = self.height as usize;
-        let half_width = (width + 1) / 2;
-        let half_height = (height + 1) / 2;
+        let half_width = width.div_ceil(2);
+        let half_height = height.div_ceil(2);
         let full_size = width * height;
         let half_size = half_width * height;
         let quarter_size = half_width * half_height;

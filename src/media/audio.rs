@@ -28,7 +28,7 @@ impl AudioDataContext {
         }
     }
 
-    pub fn get_channel_as_mut_slice(&self, channel: usize) -> Option<&'_ mut [f32]> {
+    pub fn get_channel_as_mut_slice(&mut self, channel: usize) -> Option<&'_ mut [f32]> {
         unsafe {
             let data = self.pointer.as_ref()?.data;
 

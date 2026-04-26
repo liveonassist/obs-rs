@@ -1,6 +1,6 @@
 [package]
 name = "obs-wrapper"
-version = "0.4.2-tm"
+version = "0.5.0-tm"
 authors = ["Bennett Hardwick <me@bennetthardwick.com>"]
 edition = "2024"
 license = "GPL-2.0"
@@ -12,12 +12,15 @@ repository = "https://github.com/TakiMoysha/rust-obs-plugins"
 [workspace]
 members = ["obs-sys", "plugins/*"]
 
+[features]
+default = ["obs-32"]
+obs-30 = ["obs-sys/obs-30"]
+obs-31 = ["obs-sys/obs-31"]
+obs-32 = ["obs-sys/obs-32"]
+
 [dependencies]
-obs-sys = { path = "./obs-sys", version = "0.3.1-tm" }
+obs-sys = { path = "./obs-sys", version = "0.4.0-tm", default-features = false }
 paste = "1.0.15"
 log = { version = "0.4.28", features = ["std"] }
 num-traits = "0.2.19"
 thiserror = "2.0.17"
-# obs-sys = { path = "./obs-sys", version = "0.2.1" }
-# paste = "1.0.15"
-# num-traits = "0.2.19"

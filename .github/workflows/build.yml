@@ -16,7 +16,7 @@ jobs:
         with:
           submodules: true
 
-      - uses: dtolnay/rust-toolchain@1.74.0
+      - uses: dtolnay/rust-toolchain@1.85.0
         with:
           components: rustfmt
 
@@ -26,20 +26,24 @@ jobs:
 
   cargo_clippy:
     runs-on: ubuntu-latest
+    env:
+      DONT_USE_GENERATED_BINDINGS: "true"
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
 
-      - uses: dtolnay/rust-toolchain@1.74.0
-        with:
-          components: clippy
+      - uses: DeterminateSystems/nix-installer-action@v9
 
       - uses: Swatinem/rust-cache@v2
 
-      - run: cargo clippy --all --no-deps -- -D warnings
+      - run: nix develop .#obs-v32 --command bash -c 'cargo clippy --workspace --all-targets --no-deps -- -D warnings'
 
   build_linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        obs: [30, 31, 32]
     runs-on: ubuntu-latest
     env:
       DONT_USE_GENERATED_BINDINGS: "true"
@@ -48,61 +52,113 @@ jobs:
         with:
           submodules: true
 
-      - uses: dtolnay/rust-toolchain@1.74.0
+      - uses: DeterminateSystems/nix-installer-action@v9
 
       - uses: Swatinem/rust-cache@v2
 
-      - run: |
-          sudo add-apt-repository ppa:obsproject/obs-studio
-          sudo apt-get remove libclang1-15
-          sudo apt-get update
-          sudo apt-get install obs-studio libxcb-randr0-dev libxcb-ewmh-dev
+      - name: build
+        run: |
+          nix develop .#obs-v${{ matrix.obs }} --command \
+            cargo build --verbose --workspace \
+              --no-default-features --features obs-${{ matrix.obs }}
 
-      - run: cargo build --verbose --workspace
-
-      - run: cargo test --workspace
-
-  build_windows:
-    runs-on: windows-latest
-    env:
-      DONT_USE_GENERATED_BINDINGS: "true"
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - uses: dtolnay/rust-toolchain@1.74.0
-
-      - uses: Swatinem/rust-cache@v2
-
-      - run: choco install obs-studio llvm
-
-      - run: cargo build --verbose --workspace --exclude scroll-focus-filter
-
-      - run: cargo test --workspace --exclude scroll-focus-filter
+      - name: test
+        run: |
+          nix develop .#obs-v${{ matrix.obs }} --command \
+            cargo test --workspace --exclude avatar-plugin \
+              --no-default-features --features obs-${{ matrix.obs }}
 
   build_macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        obs: [30, 31, 32]
+        include:
+          # Full release versions used to download the .dmg from
+          # github.com/obsproject/obs-studio/releases. macOS doesn't have a
+          # per-version package manager path that's as clean as choco/Nix, so
+          # we mount the official DMG and copy OBS.app into /Applications,
+          # which is where obs-sys/build_mac.rs already looks.
+          - obs: 30
+            obs_full_version: "30.2.3"
+          - obs: 31
+            obs_full_version: "31.1.2"
+          - obs: 32
+            obs_full_version: "32.1.2"
     runs-on: macos-latest
     env:
       DONT_USE_GENERATED_BINDINGS: "true"
-    # if: github.ref == 'refs/heads/master'
+      OBS_LIBRARY_MAJOR_VER: ${{ matrix.obs }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
 
-      - uses: dtolnay/rust-toolchain@1.74.0
+      - uses: dtolnay/rust-toolchain@1.85.0
 
       - uses: Swatinem/rust-cache@v2
 
-      - run: brew install --cask obs
+      - name: install OBS ${{ matrix.obs_full_version }}
+        run: |
+          set -euxo pipefail
+          arch="$(uname -m)"
+          # OBS ships separate arm64 and intel DMGs from 30.x onward.
+          case "$arch" in
+            arm64) suffix="macos-apple.dmg" ;;
+            x86_64) suffix="macos-intel.dmg" ;;
+            *) echo "unsupported arch: $arch"; exit 1 ;;
+          esac
+          url="https://github.com/obsproject/obs-studio/releases/download/${{ matrix.obs_full_version }}/obs-studio-${{ matrix.obs_full_version }}-${suffix}"
+          curl -L -o /tmp/obs.dmg "$url"
+          mount_point="$(hdiutil attach -nobrowse /tmp/obs.dmg | tail -1 | awk '{print $3}')"
+          sudo cp -R "$mount_point/OBS.app" /Applications/
+          hdiutil detach "$mount_point"
 
-      - run: cargo build --verbose --workspace --exclude scroll-focus-filter
-
-      - run: cargo test --workspace --exclude scroll-focus-filter
+      - run: cargo build --verbose --workspace --exclude scroll-focus-filter --no-default-features --features obs-${{ matrix.obs }}
         env:
-          # Set this so that the test pass!
-          # Maybe you don't need to do this when running the plugin from OBS? I don't know.
-          # If you own a Mac please do something better.
           DYLD_FALLBACK_FRAMEWORK_PATH: "/Applications/OBS.app/Contents/Frameworks"
           DYLD_FALLBACK_LIBRARY_PATH: "/Applications/OBS.app/Contents/Frameworks"
+
+      - run: cargo test --workspace --exclude scroll-focus-filter --exclude avatar-plugin --no-default-features --features obs-${{ matrix.obs }}
+        env:
+          DYLD_FALLBACK_FRAMEWORK_PATH: "/Applications/OBS.app/Contents/Frameworks"
+          DYLD_FALLBACK_LIBRARY_PATH: "/Applications/OBS.app/Contents/Frameworks"
+
+  build_windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        obs: [30, 31, 32]
+        include:
+          # Pin choco to the same minor.patch our submodules are at where the
+          # choco index has them. If a pinned version disappears from choco,
+          # swap in a `gh release download` of the matching MSI from
+          # github.com/obsproject/obs-studio.
+          - obs: 30
+            choco_version: "30.2.3"
+          - obs: 31
+            choco_version: "31.1.2"
+          - obs: 32
+            choco_version: "32.1.2"
+    runs-on: windows-latest
+    env:
+      DONT_USE_GENERATED_BINDINGS: "true"
+      OBS_LIBRARY_MAJOR_VER: ${{ matrix.obs }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: dtolnay/rust-toolchain@1.85.0
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: install OBS ${{ matrix.choco_version }}
+        shell: pwsh
+        run: |
+          choco install llvm -y --no-progress
+          choco install obs-studio --version=${{ matrix.choco_version }} -y --no-progress
+
+      - run: cargo build --verbose --workspace --exclude scroll-focus-filter --no-default-features --features obs-${{ matrix.obs }}
+
+      - run: cargo test --workspace --exclude scroll-focus-filter --exclude avatar-plugin --no-default-features --features obs-${{ matrix.obs }}

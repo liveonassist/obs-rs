@@ -1,6 +1,6 @@
 use super::context::{CreatableSourceContext, GlobalContext, VideoRenderContext};
-use super::{traits::*, SourceRef};
 use super::{EnumActiveContext, EnumAllContext};
+use super::{SourceRef, traits::*};
 use crate::media::{audio::AudioDataContext, video::VideoDataSourceContext};
 use crate::{
     data::DataObj,

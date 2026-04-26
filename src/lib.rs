@@ -1,3 +1,9 @@
+// Edition 2024 promotes calls to unsafe fns inside `unsafe fn` bodies into a
+// warn-by-default lint. Most of this crate predates that change; gate it off
+// crate-wide so we don't blanket-rewrite every callsite. New code should still
+// prefer explicit `unsafe { … }` blocks.
+#![allow(unsafe_op_in_unsafe_fn)]
+
 //! # Rust OBS Wrapper
 //!
 //! A safe wrapper around the OBS API, useful for creating OBS sources, filters
@@ -117,8 +123,8 @@
 //!
 //! 1. Run `cargo build --release`
 //! 2. Copy `/target/release/<module-name>.so` to your OBS plugins folder
-//! (`/usr/lib/obs-plugins/`) 3. The plugin should be available for use from
-//! inside OBS
+//!    (`/usr/lib/obs-plugins/`)
+//! 3. The plugin should be available for use from inside OBS
 
 /// Raw bindings of OBS C API
 pub use obs_sys;

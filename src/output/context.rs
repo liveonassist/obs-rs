@@ -15,8 +15,8 @@ use obs_sys::{
 use crate::hotkey::HotkeyCallbacks;
 use crate::media::{audio::AudioRef, video::VideoRef};
 use crate::string::TryIntoObsString;
-use crate::{hotkey::Hotkey, prelude::DataObj, string::ObsString, wrapper::PtrWrapper};
 use crate::{Error, Result};
+use crate::{hotkey::Hotkey, prelude::DataObj, string::ObsString, wrapper::PtrWrapper};
 
 #[deprecated = "use `OutputRef` instead"]
 pub type OutputContext = OutputRef;
@@ -40,7 +40,8 @@ impl_ptr_wrapper!(
 unsafe extern "C" fn enum_proc(params: *mut std::ffi::c_void, output: *mut obs_output_t) -> bool {
     let mut v = unsafe { Box::<Vec<*mut obs_output_t>>::from_raw(params as *mut _) };
     v.push(output);
-    Box::into_raw(v);
+    // Hand the box back to the caller as a raw pointer; OBS still owns it.
+    let _ = Box::into_raw(v);
     true
 }
 

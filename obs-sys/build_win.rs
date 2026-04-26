@@ -7,8 +7,8 @@ use std::io::prelude::*;
 use std::io::{self, BufWriter};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_READ, KEY_WOW64_32KEY};
 use winreg::RegKey;
+use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_READ, KEY_WOW64_32KEY, KEY_WOW64_64KEY};
 
 fn generate_def<P: AsRef<OsStr>, Q: AsRef<Path>>(
     mut dumpbin: Command,
@@ -60,13 +60,14 @@ pub fn find_windows_obs_lib() {
                 let def_path = out_path.join("obs.def");
                 let lib_path = out_path.join("obs.lib");
                 if let Ok(()) = generate_def(dumpbin, &dll_path.join("obs.dll"), &def_path) {
-                    assert!(lib
-                        .arg(format!("/DEF:{}", def_path.to_str().unwrap()))
-                        .arg(format!("/OUT:{}", lib_path.to_str().unwrap()))
-                        .arg(format!("/MACHINE:{}", arch))
-                        .status()
-                        .unwrap()
-                        .success());
+                    assert!(
+                        lib.arg(format!("/DEF:{}", def_path.to_str().unwrap()))
+                            .arg(format!("/OUT:{}", lib_path.to_str().unwrap()))
+                            .arg(format!("/MACHINE:{}", arch))
+                            .status()
+                            .unwrap()
+                            .success()
+                    );
                 }
 
                 let def_path = out_path.join("obs-frontend-api.def");
@@ -74,13 +75,14 @@ pub fn find_windows_obs_lib() {
                 if let Ok(()) =
                     generate_def(dumpbin2, &dll_path.join("obs-frontend-api.dll"), &def_path)
                 {
-                    assert!(lib2
-                        .arg(format!("/DEF:{}", def_path.to_str().unwrap()))
-                        .arg(format!("/OUT:{}", lib_path.to_str().unwrap()))
-                        .arg(format!("/MACHINE:{}", arch))
-                        .status()
-                        .unwrap()
-                        .success());
+                    assert!(
+                        lib2.arg(format!("/DEF:{}", def_path.to_str().unwrap()))
+                            .arg(format!("/OUT:{}", lib_path.to_str().unwrap()))
+                            .arg(format!("/MACHINE:{}", arch))
+                            .status()
+                            .unwrap()
+                            .success()
+                    );
                     println!(
                         "cargo:rustc-link-search=native={}",
                         out_path.to_str().unwrap()
@@ -91,4 +93,29 @@ pub fn find_windows_obs_lib() {
         }
         return;
     }
+}
+
+pub fn detect_obs_major() -> Option<u32> {
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let uninstall_paths = [
+        "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\OBS Studio",
+        "SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\OBS Studio",
+    ];
+    for path in uninstall_paths {
+        for flags in [KEY_READ | KEY_WOW64_64KEY, KEY_READ | KEY_WOW64_32KEY] {
+            if let Ok(key) = hklm.open_subkey_with_flags(path, flags) {
+                if let Ok(version) = key.get_value::<String, _>("DisplayVersion") {
+                    if let Some(major) = version
+                        .trim()
+                        .split('.')
+                        .next()
+                        .and_then(|s| s.parse().ok())
+                    {
+                        return Some(major);
+                    }
+                }
+            }
+        }
+    }
+    None
 }

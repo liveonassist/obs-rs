@@ -30,13 +30,12 @@ impl TextureRenderer for SimpleRenderer {
     }
 }
 
-
-
 /// Renderer for the right hand that follows the mouse
+#[allow(dead_code)] // example struct; some fields are wired up for future use
 struct HandRenderer {
-    pivot: Vec2,      // Point on the texture to rotate around (shoulder)
-    position: Vec2,   // Base position on screen
-    mouse_pos: Vec2,  // Current mouse position
+    pivot: Vec2,     // Point on the texture to rotate around (shoulder)
+    position: Vec2,  // Base position on screen
+    mouse_pos: Vec2, // Current mouse position
     scale: f32,
     source_rect: Option<Rect>, // Region of the texture to draw (for atlases)
 }
@@ -59,19 +58,19 @@ impl TextureRenderer for HandRenderer {
         // Assuming the texture is drawn at self.position
         // The pivot is relative to the texture top-left
         let screen_pivot = self.position + self.pivot;
-        
+
         let diff = self.mouse_pos - screen_pivot;
-        
+
         // Calculate angle
         // We add an offset because the sprite might not be pointing exactly right/up at 0 degrees
-        // Usually 0 degrees is 3 o'clock (Right). 
-        // Let's assume the hand sprite points UP or LEFT by default. 
+        // Usually 0 degrees is 3 o'clock (Right).
+        // Let's assume the hand sprite points UP or LEFT by default.
         // We might need to tweak this 'angle_offset'.
-        let angle_offset = 90.0f32.to_radians(); 
+        let angle_offset = 90.0f32.to_radians();
         let rotation = diff.y.atan2(diff.x) + angle_offset;
 
         // Clamp rotation to avoid breaking the arm
-        // let rotation = rotation.clamp(-1.0, 2.0); 
+        // let rotation = rotation.clamp(-1.0, 2.0);
 
         draw_texture_ex(
             texture,
@@ -87,7 +86,7 @@ impl TextureRenderer for HandRenderer {
                 pivot: Some(self.pivot),
             },
         );
-        
+
         // Debug: draw pivot and target line
         // draw_circle(screen_pivot.x, screen_pivot.y, 5.0, RED);
         // draw_line(screen_pivot.x, screen_pivot.y, self.mouse_pos.x, self.mouse_pos.y, 2.0, BLUE);
@@ -144,8 +143,6 @@ impl<'a> TextureRenderer for KeyPressAnimationRenderer<'a> {
     }
 }
 
-
-
 // ============================================================================
 // MAIN
 // ============================================================================
@@ -183,9 +180,9 @@ async fn main() {
         .left_hand
         .as_ref()
         .map(|h| load_texture_from_image_data(&h.up_image));
-    
+
     // Load left hand key frames from the new structure (keycode -> texture)
-    let mut left_hand_key_frames: std::collections::HashMap<u32, Texture2D> = 
+    let mut left_hand_key_frames: std::collections::HashMap<u32, Texture2D> =
         std::collections::HashMap::new();
     for (&keycode, image_data) in &mode.left_hand_key_frames {
         left_hand_key_frames.insert(keycode, load_texture_from_image_data(image_data));
@@ -195,9 +192,9 @@ async fn main() {
         .right_hand
         .as_ref()
         .map(|h| load_texture_from_image_data(&h.up_image));
-    
+
     // Load right hand key frames from the new structure (keycode -> texture)
-    let mut right_hand_key_frames: std::collections::HashMap<u32, Texture2D> = 
+    let mut right_hand_key_frames: std::collections::HashMap<u32, Texture2D> =
         std::collections::HashMap::new();
     for (&keycode, image_data) in &mode.right_hand_key_frames {
         right_hand_key_frames.insert(keycode, load_texture_from_image_data(image_data));
@@ -254,13 +251,13 @@ async fn main() {
     let start_time = get_time();
 
     // Hand animation state
+    #[allow(unused_assignments)]
     let mut left_hand_state = HandState::Up;
     #[allow(unused_assignments)]
     let mut right_hand_state = HandState::Up;
 
-
     loop {
-        let current_time = (get_time() - start_time) as f32;
+        let _current_time = (get_time() - start_time) as f32;
 
         // Input handling
         if is_key_down(KeyCode::Escape) {
@@ -281,7 +278,7 @@ async fn main() {
         let mut right_hand_pressed = false;
         let mut left_hand_pressed_key: Option<u32> = None;
         let mut right_hand_pressed_key: Option<u32> = None;
-        
+
         // Check if any pressed key has a corresponding hand frame
         for &key_code in &pressed_keys {
             // Check left hand
@@ -289,7 +286,7 @@ async fn main() {
                 left_hand_pressed = true;
                 left_hand_pressed_key = Some(key_code);
             }
-            
+
             // Check right hand
             if right_hand_key_frames.contains_key(&key_code) {
                 right_hand_pressed = true;
@@ -337,7 +334,7 @@ async fn main() {
         let mouse_pos = mouse_position();
         let screen_center = Vec2::new(screen_width() / 2.0, screen_height() / 2.0);
         let mouse_offset = Vec2::new(mouse_pos.0 - screen_center.x, mouse_pos.1 - screen_center.y);
-        let mouse_influence = Vec2::new(
+        let _mouse_influence = Vec2::new(
             (mouse_offset.x / screen_width()).clamp(-1.0, 1.0),
             (mouse_offset.y / screen_height()).clamp(-1.0, 1.0),
         );
@@ -363,10 +360,10 @@ async fn main() {
         // Draw pressed keys images (before hands so hands are on top)
         for (key_str, tex) in &key_textures {
             // Try to parse key string as keycode
-            if let Ok(key_code) = key_str.parse::<u32>() {
-                if pressed_keys.contains(&key_code) {
-                    simple_renderer.render(tex, Vec2::ZERO);
-                }
+            if let Ok(key_code) = key_str.parse::<u32>()
+                && pressed_keys.contains(&key_code)
+            {
+                simple_renderer.render(tex, Vec2::ZERO);
             }
         }
 
@@ -394,13 +391,13 @@ async fn main() {
                 // Standard mode (Live2D fallback) - Follow mouse
                 // We assume the texture is roughly 512x512.
                 // Let's place the shoulder at (700, 400) and pivot at (50, 50) of the texture.
-                
+
                 let hand_pos = Vec2::new(700.0, 400.0); // Approximate shoulder position on screen
-                let pivot = Vec2::new(50.0, 50.0);      // Pivot within the hand texture (top-left of hand)
-                
+                let pivot = Vec2::new(50.0, 50.0); // Pivot within the hand texture (top-left of hand)
+
                 // If using atlas (texture_00.png), you can specify the region here.
                 // For example: Some(Rect::new(0.0, 0.0, 200.0, 200.0))
-                let source_rect = None; 
+                let source_rect = None;
 
                 let renderer = HandRenderer::new(
                     pivot,
@@ -408,21 +405,13 @@ async fn main() {
                     Vec2::new(mouse_pos.0, mouse_pos.1),
                     source_rect,
                 );
-                renderer.render(tex, Vec2::ZERO); 
+                renderer.render(tex, Vec2::ZERO);
             }
         }
 
         // UI overlay
         draw_text(&format!("Mode: {}", mode.name), 20.0, 20.0, 30.0, BLACK);
-        draw_text(
-            "Press ESC to exit",
-            20.0,
-            50.0,
-            20.0,
-            DARKGRAY,
-        );
-
-
+        draw_text("Press ESC to exit", 20.0, 50.0, 20.0, DARKGRAY);
 
         // Hand animation state
         let hand_state_text = match left_hand_state {

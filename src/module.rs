@@ -1,5 +1,5 @@
-use crate::output::{traits::Outputable, OutputInfo, OutputInfoBuilder};
-use crate::source::{traits::Sourceable, SourceInfo, SourceInfoBuilder};
+use crate::output::{OutputInfo, OutputInfoBuilder, traits::Outputable};
+use crate::source::{SourceInfo, SourceInfoBuilder, traits::Sourceable};
 use crate::string::{DisplayExt as _, ObsString, TryIntoObsString as _};
 use crate::{Error, Result};
 use obs_sys::{

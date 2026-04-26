@@ -2,22 +2,28 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
+fn install_roots() -> Vec<PathBuf> {
+    vec![
+        PathBuf::from(&*shellexpand::tilde("~/Applications/OBS.app")),
+        PathBuf::from("/Applications/OBS.app"),
+    ]
+}
+
 pub fn find_mac_obs_lib() {
     if let Some(path) = env::var("LIBOBS_PATH").ok() {
         println!("cargo:rustc-link-search=native={}", path);
         return;
     }
 
-    let candidates = [
-        PathBuf::from(&*shellexpand::tilde(
-            "~/Applications/OBS.app/Contents/MacOS",
-        )),
-        PathBuf::from(&*shellexpand::tilde(
-            "~/Applications/OBS.app/Contents/Frameworks",
-        )),
-        PathBuf::from("/Applications/OBS.app/Contents/Frameworks"),
-        PathBuf::from("/Applications/OBS.app/Contents/MacOS"),
-    ];
+    let candidates: Vec<PathBuf> = install_roots()
+        .into_iter()
+        .flat_map(|root| {
+            [
+                root.join("Contents/MacOS"),
+                root.join("Contents/Frameworks"),
+            ]
+        })
+        .collect();
 
     let mut found_obs = false;
     let mut found_obs_frontend = false;
@@ -59,4 +65,27 @@ pub fn find_mac_obs_lib() {
     if !found_obs_frontend {
         panic!("could not find libobs-frontend-api - install OBS or set LIBOBS_PATH");
     }
+}
+
+pub fn detect_obs_major() -> Option<u32> {
+    for root in install_roots() {
+        let plist = root.join("Contents/Info.plist");
+        let Ok(contents) = fs::read_to_string(&plist) else {
+            continue;
+        };
+        // Info.plist is XML; find the value following the CFBundleShortVersionString key.
+        if let Some(major) = parse_short_version_major(&contents) {
+            return Some(major);
+        }
+    }
+    None
+}
+
+fn parse_short_version_major(plist: &str) -> Option<u32> {
+    let key = "<key>CFBundleShortVersionString</key>";
+    let after_key = plist.split_once(key)?.1;
+    let open = after_key.find("<string>")?;
+    let rest = &after_key[open + "<string>".len()..];
+    let close = rest.find("</string>")?;
+    rest[..close].trim().split('.').next()?.parse().ok()
 }

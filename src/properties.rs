@@ -2,7 +2,7 @@
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
 use crate::{native_enum, string::ObsString, wrapper::PtrWrapper};
-use num_traits::{one, Bounded, Float, Num, NumCast, PrimInt, ToPrimitive};
+use num_traits::{Bounded, Float, Num, NumCast, PrimInt, ToPrimitive, one};
 use obs_sys::{
     obs_combo_format, obs_combo_format_OBS_COMBO_FORMAT_FLOAT,
     obs_combo_format_OBS_COMBO_FORMAT_INT, obs_combo_format_OBS_COMBO_FORMAT_INVALID,
@@ -102,7 +102,7 @@ impl Properties {
         name: ObsString,
         description: ObsString,
         editable: bool,
-    ) -> ListProp<T> {
+    ) -> ListProp<'_, T> {
         unsafe {
             let raw = obs_properties_add_list(
                 self.pointer,

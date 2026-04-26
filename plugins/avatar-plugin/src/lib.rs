@@ -4,8 +4,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic;
 
-pub mod loader;
 pub mod input_capture;
+pub mod loader;
 
 use loader::{Avatar, AvatarLoader, ImageData};
 
@@ -68,6 +68,7 @@ impl Drop for TextureCache {
 }
 
 /// Главный источник аватара
+#[allow(dead_code)] // a few fields are state held for OBS lifetime guarantees and aren't read directly
 struct AvatarSource {
     /// Ссылка на источник
     source: SourceRef,
@@ -174,7 +175,7 @@ impl Sourceable for AvatarSource {
                             println!("      - frame_images: {}", rh.frame_images.len());
                         }
                         println!("    Key images: {} keys", mode.key_images.len());
-                        for (key, _img) in &mode.key_images {
+                        for key in mode.key_images.keys() {
                             println!("      - {}", key);
                         }
                     } else {
@@ -446,7 +447,10 @@ impl VideoRenderSource for AvatarSource {
             println!("Has left_hand: {}", mode.left_hand.is_some());
             println!("Has right_hand: {}", mode.right_hand.is_some());
             println!("Left hand key frames: {}", mode.left_hand_key_frames.len());
-            println!("Right hand key frames: {}", mode.right_hand_key_frames.len());
+            println!(
+                "Right hand key frames: {}",
+                mode.right_hand_key_frames.len()
+            );
             println!("Key images: {}", mode.key_images.len());
             println!("=========================\n");
             FIRST_RENDER.store(false, std::sync::atomic::Ordering::Relaxed);
@@ -484,10 +488,10 @@ impl VideoRenderSource for AvatarSource {
         }
 
         // 3. Отрисовка лица
-        if let Some(face_name) = current_face {
-            if let Some(face) = avatar.face_images.get(face_name) {
-                draw_sprite(texture_cache, face, 0.0, 0.0);
-            }
+        if let Some(face_name) = current_face
+            && let Some(face) = avatar.face_images.get(face_name)
+        {
+            draw_sprite(texture_cache, face, 0.0, 0.0);
         }
 
         // 4. Отрисовка нажатых клавиш (перед руками, чтобы руки были сверху)
@@ -512,7 +516,7 @@ impl VideoRenderSource for AvatarSource {
                 if mode.left_hand_key_frames.contains_key(&key_code) {
                     left_hand_pressed_key = Some(key_code);
                 }
-                
+
                 // Проверяем правую руку
                 if mode.right_hand_key_frames.contains_key(&key_code) {
                     right_hand_pressed_key = Some(key_code);
@@ -556,7 +560,7 @@ impl VideoRenderSource for AvatarSource {
         use std::sync::atomic::{AtomicUsize, Ordering};
         static FRAME_COUNT: AtomicUsize = AtomicUsize::new(0);
         let frame = FRAME_COUNT.fetch_add(1, Ordering::Relaxed);
-        if frame % 300 == 0 {
+        if frame.is_multiple_of(300) {
             println!("✓ Rendered frame {}", frame);
         }
     }
@@ -608,11 +612,11 @@ impl KeyClickSource for AvatarSource {
             }
 
             // Проверяем, есть ли это клавиша в текущем режиме
-            if let Some(mode) = avatar.get_mode(&self.current_mode) {
-                if let Some(_key_img) = mode.key_images.get(&key_str) {
-                    // TODO: Показать анимацию нажатия клавиши
-                    // TODO: Анимировать руки
-                }
+            if let Some(mode) = avatar.get_mode(&self.current_mode)
+                && let Some(_key_img) = mode.key_images.get(&key_str)
+            {
+                // TODO: Показать анимацию нажатия клавиши
+                // TODO: Анимировать руки
             }
         } else {
             // Убираем из набора нажатых клавиш

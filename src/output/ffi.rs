@@ -1,4 +1,4 @@
-use super::{traits::*, CreatableOutputContext, OutputRef};
+use super::{CreatableOutputContext, OutputRef, traits::*};
 use crate::hotkey::{Hotkey, HotkeyCallbacks};
 use crate::{data::DataObj, wrapper::PtrWrapper};
 use obs_sys::{
