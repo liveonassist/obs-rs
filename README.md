@@ -160,21 +160,28 @@ check your install for the right location.
 ## Development
 
 The repo ships a Nix flake with the rust toolchain, `libclang` for
-`obs-sys` bindgen, and `obs-studio` for headers and linking:
+`obs-sys` bindgen, and `obs-studio` for linking against `libobs` and
+`libobs-frontend-api`:
 
 ```sh
 cp .envrc.template .envrc   # if you use direnv
 direnv allow                # or: nix develop
 ```
 
-The flake points `BINDGEN_EXTRA_CLANG_ARGS` at nixpkgs' OBS headers, so
-you do **not** need to check out the `obs-sys/obs` submodule for local
-development. If you do want headers from a specific upstream OBS:
+OBS **headers** come from the `obs-sys/obs` git submodule, not from
+nixpkgs — the submodule pin is the OBS version this repo builds
+against, so bumping it is the canonical way to upgrade. Initialize it
+once, then bump as needed:
 
 ```sh
-git submodule update --init --recursive
-git submodule update --remote obs-sys/obs   # bump pinned OBS
+git submodule update --init --recursive       # first checkout
+git submodule update --remote obs-sys/obs     # bump pinned OBS
 ```
+
+If the submodule isn't checked out, `obs-sys`'s `build.rs` falls back
+to its pre-generated bindings — fine for casual builds, but the
+compatibility table above only applies to the pinned submodule
+revision.
 
 ## License
 

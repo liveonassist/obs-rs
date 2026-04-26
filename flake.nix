@@ -43,8 +43,10 @@
             llvmPackages.libclang
             pkg-config
 
-            # OBS itself — provides libobs + obs-frontend-api for linking
-            # and the headers under its include/ tree.
+            # OBS — provides libobs + obs-frontend-api .so files for linking.
+            # Headers come from the obs-sys/obs submodule (pinned in this
+            # repo) so the OBS version we build against is tracked in git,
+            # not coupled to whatever nixpkgs ships.
             obs-studio
 
             # Submodule + general tooling
@@ -60,14 +62,17 @@
           LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
 
           shellHook = ''
-            # Point obs-sys's bindgen at the OBS headers shipped by nixpkgs
-            # so it doesn't need the obs-studio submodule checked out for
-            # local development.
-            export BINDGEN_EXTRA_CLANG_ARGS="-I${pkgs.obs-studio}/include/obs"
-
             echo "rust-obs-plugins dev shell"
             echo "  rustc:      $(rustc --version 2>/dev/null || echo 'not found')"
-            echo "  obs-studio: ${pkgs.obs-studio.version}"
+            echo "  obs (link): ${pkgs.obs-studio.version} (from nixpkgs)"
+
+            if [ ! -f obs-sys/obs/libobs/obs.h ]; then
+              echo ""
+              echo "  ! obs-sys/obs submodule is not initialized."
+              echo "    bindgen will fall back to the pre-generated bindings."
+              echo "    To track a specific OBS version, run:"
+              echo "      git submodule update --init --recursive"
+            fi
           '';
         };
       }
