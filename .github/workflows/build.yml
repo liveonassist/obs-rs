@@ -45,7 +45,12 @@ jobs:
         with:
           submodules: true
 
-      - uses: DeterminateSystems/nix-installer-action@v9
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
 
       - uses: Swatinem/rust-cache@v2
 
@@ -64,7 +69,12 @@ jobs:
         with:
           submodules: true
 
-      - uses: DeterminateSystems/nix-installer-action@v9
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
 
       - uses: Swatinem/rust-cache@v2
 
