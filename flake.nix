@@ -62,16 +62,20 @@
           LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
 
           shellHook = ''
-            echo "rust-obs-plugins dev shell"
-            echo "  rustc:      $(rustc --version 2>/dev/null || echo 'not found')"
-            echo "  obs (link): ${pkgs.obs-studio.version} (from nixpkgs)"
-
-            if [ ! -f obs-sys/obs/libobs/obs.h ]; then
-              echo ""
-              echo "  ! obs-sys/obs submodule is not initialized."
-              echo "    bindgen will fall back to the pre-generated bindings."
-              echo "    To track a specific OBS version, run:"
-              echo "      git submodule update --init --recursive"
+            echo "🎬 rust-obs-plugins development environment loaded!"
+            echo ""
+            echo "Language runtimes:"
+            echo "  - 🦀 Rust:   $(rustc --version 2>/dev/null || echo 'not found')"
+            echo "  - 🐍 Python: $(python --version 2>/dev/null || echo 'not found')"
+            echo ""
+            echo "OBS:"
+            echo "  - 🔗 Linking against obs-studio ${pkgs.obs-studio.version} (from nixpkgs)"
+            if [ -f obs-sys/obs/libobs/obs.h ]; then
+              submodule_rev="$(git -C obs-sys/obs rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
+              echo "  - 📌 Headers from obs-sys/obs submodule @ $submodule_rev"
+            else
+              echo "  - ⚠️  obs-sys/obs submodule not initialized — bindgen will use pre-generated bindings"
+              echo "       run: git submodule update --init --recursive"
             fi
           '';
         };
