@@ -6,8 +6,8 @@
 //!
 //! ```ignore
 //! impl Encodable for MyH264 {
-//!     fn get_id() -> ObsString { obs_string!("my_h264") }
-//!     fn get_codec() -> ObsString { obs_string!("h264") }
+//!     fn get_id() -> &'static CStr { c"my_h264" }
+//!     fn get_codec() -> &'static CStr { c"h264" }
 //!     fn get_type() -> EncoderType { EncoderType::Video }
 //!     fn create(ctx: &mut CreatableEncoderContext<Self>, encoder: EncoderRef)
 //!         -> Result<Self, CreateError>
@@ -42,10 +42,12 @@ use obs_rs_sys::{
 };
 use paste::item;
 
-use crate::Result;
+use std::ffi::CString;
+
 use crate::media::{audio::AudioRef, video::VideoRef};
-use crate::string::{ObsString, TryIntoObsString as _};
+use crate::string::cstring_from_ptr;
 use crate::wrapper::PtrWrapper;
+use crate::{Error, Result};
 
 pub use context::*;
 pub use traits::*;
@@ -94,16 +96,19 @@ impl_ptr_wrapper!(
 );
 
 impl EncoderRef {
-    pub fn name(&self) -> Result<ObsString> {
-        unsafe { obs_encoder_get_name(self.inner) }.try_into_obs_string()
+    pub fn name(&self) -> Result<CString> {
+        unsafe { cstring_from_ptr(obs_encoder_get_name(self.inner)) }
+            .ok_or(Error::NulPointer("obs_encoder_get_name"))
     }
 
-    pub fn id(&self) -> Result<ObsString> {
-        unsafe { obs_encoder_get_id(self.inner) }.try_into_obs_string()
+    pub fn id(&self) -> Result<CString> {
+        unsafe { cstring_from_ptr(obs_encoder_get_id(self.inner)) }
+            .ok_or(Error::NulPointer("obs_encoder_get_id"))
     }
 
-    pub fn codec(&self) -> Result<ObsString> {
-        unsafe { obs_encoder_get_codec(self.inner) }.try_into_obs_string()
+    pub fn codec(&self) -> Result<CString> {
+        unsafe { cstring_from_ptr(obs_encoder_get_codec(self.inner)) }
+            .ok_or(Error::NulPointer("obs_encoder_get_codec"))
     }
 
     pub fn width(&self) -> u32 {
@@ -192,13 +197,13 @@ impl<D: Encodable> EncoderInfoBuilder<D> {
                 || self.info.encode_texture.is_some()
                 || self.info.encode_texture2.is_some(),
             "encoder `{}` has no encode callback — call .enable_encode() or .enable_encode_texture()",
-            D::get_id().as_str().trim_end_matches('\0'),
+            D::get_id().to_string_lossy(),
         );
         if D::get_type() == EncoderType::Audio {
             debug_assert!(
                 self.info.get_frame_size.is_some(),
                 "audio encoder `{}` must implement GetFrameSizeEncoder",
-                D::get_id().as_str().trim_end_matches('\0'),
+                D::get_id().to_string_lossy(),
             );
         }
 

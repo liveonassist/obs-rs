@@ -5,7 +5,6 @@ use crate::media::{audio::AudioDataContext, video::VideoDataSourceContext};
 use crate::{
     data::DataObj,
     hotkey::{Hotkey, HotkeyCallbacks},
-    string::DisplayExt as _,
     wrapper::PtrWrapper,
 };
 use paste::item;
@@ -107,7 +106,7 @@ pub unsafe extern "C" fn create<D: Sourceable>(
     let Some(settings) = DataObj::from_raw_unchecked(settings) else {
         log::error!(
             "obs handed null settings to source::create for `{}`; aborting create",
-            D::get_id().display()
+            D::get_id().to_string_lossy()
         );
         return std::ptr::null_mut();
     };
@@ -115,7 +114,7 @@ pub unsafe extern "C" fn create<D: Sourceable>(
     let Some(source_context) = SourceRef::from_raw(source) else {
         log::error!(
             "obs handed null obs_source_t to source::create for `{}`; aborting create",
-            D::get_id().display()
+            D::get_id().to_string_lossy()
         );
         forget(context.settings);
         return std::ptr::null_mut();
@@ -124,7 +123,7 @@ pub unsafe extern "C" fn create<D: Sourceable>(
     let data = match D::create(&mut context, source_context) {
         Ok(data) => data,
         Err(e) => {
-            log::error!("source::create for `{}` failed: {}", D::get_id().display(), e);
+            log::error!("source::create for `{}` failed: {}", D::get_id().to_string_lossy(), e);
             forget(context.settings);
             return std::ptr::null_mut();
         }

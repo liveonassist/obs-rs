@@ -1,4 +1,4 @@
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 
 use obs_rs_sys::{
     obs_encoder_t, obs_enum_output_types, obs_enum_outputs, obs_output_active, obs_output_audio,
@@ -14,9 +14,9 @@ use obs_rs_sys::{
 
 use crate::hotkey::HotkeyCallbacks;
 use crate::media::{audio::AudioRef, video::VideoRef};
-use crate::string::TryIntoObsString;
+use crate::string::cstring_from_ptr;
 use crate::{Error, Result};
-use crate::{hotkey::Hotkey, prelude::DataObj, string::ObsString, wrapper::PtrWrapper};
+use crate::{hotkey::Hotkey, prelude::DataObj, wrapper::PtrWrapper};
 
 #[deprecated = "use `OutputRef` instead"]
 pub type OutputContext = OutputRef;
@@ -46,7 +46,7 @@ unsafe extern "C" fn enum_proc(params: *mut std::ffi::c_void, output: *mut obs_o
 }
 
 impl OutputRef {
-    pub fn new(id: ObsString, name: ObsString, settings: Option<DataObj<'_>>) -> Result<Self> {
+    pub fn new(id: &CStr, name: &CStr, settings: Option<DataObj<'_>>) -> Result<Self> {
         let settings = match settings {
             Some(data) => unsafe { data.as_ptr_mut() },
             None => std::ptr::null_mut(),
@@ -92,12 +92,14 @@ impl OutputRef {
         types
     }
 
-    pub fn output_id(&self) -> Result<ObsString> {
-        unsafe { obs_output_get_id(self.inner) }.try_into_obs_string()
+    pub fn output_id(&self) -> Result<CString> {
+        unsafe { cstring_from_ptr(obs_output_get_id(self.inner)) }
+            .ok_or(Error::NulPointer("obs_output_get_id"))
     }
 
-    pub fn name(&self) -> Result<ObsString> {
-        unsafe { obs_output_get_name(self.inner) }.try_into_obs_string()
+    pub fn name(&self) -> Result<CString> {
+        unsafe { cstring_from_ptr(obs_output_get_name(self.inner)) }
+            .ok_or(Error::NulPointer("obs_output_get_name"))
     }
 
     pub fn start(&mut self) -> bool {
@@ -199,11 +201,11 @@ impl<'a, D> CreatableOutputContext<'a, D> {
 
     pub fn register_hotkey<F: FnMut(&mut Hotkey, &mut D) + 'static>(
         &mut self,
-        name: ObsString,
-        description: ObsString,
+        name: impl Into<CString>,
+        description: impl Into<CString>,
         func: F,
     ) {
         self.hotkey_callbacks
-            .push((name, description, Box::new(func)));
+            .push((name.into(), description.into(), Box::new(func)));
     }
 }

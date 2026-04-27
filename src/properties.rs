@@ -1,7 +1,7 @@
 #![allow(non_upper_case_globals)]
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
 
-use crate::{native_enum, string::ObsString, wrapper::PtrWrapper};
+use crate::{native_enum, string::ptr_or_null, wrapper::PtrWrapper};
 use num_traits::{Bounded, Float, Num, NumCast, PrimInt, ToPrimitive, one};
 use obs_rs_sys::{
     obs_combo_format, obs_combo_format_OBS_COMBO_FORMAT_FLOAT,
@@ -24,7 +24,12 @@ use obs_rs_sys::{
     obs_text_type_OBS_TEXT_MULTILINE, obs_text_type_OBS_TEXT_PASSWORD, size_t,
 };
 
-use std::{marker::PhantomData, ops::RangeBounds, os::raw::c_int};
+use std::{
+    ffi::{CStr, CString},
+    marker::PhantomData,
+    ops::RangeBounds,
+    os::raw::c_int,
+};
 
 native_enum!(TextType, obs_text_type {
     Default => OBS_TEXT_DEFAULT,
@@ -87,8 +92,8 @@ impl Properties {
 
     pub fn add<T: ObsProp>(
         &mut self,
-        name: ObsString,
-        description: ObsString,
+        name: &CStr,
+        description: &CStr,
         prop: T,
     ) -> &mut Self {
         unsafe {
@@ -99,8 +104,8 @@ impl Properties {
 
     pub fn add_list<T: ListType>(
         &mut self,
-        name: ObsString,
-        description: ObsString,
+        name: &CStr,
+        description: &CStr,
         editable: bool,
     ) -> ListProp<'_, T> {
         unsafe {
@@ -156,12 +161,12 @@ impl<T> PtrWrapper for ListProp<'_, T> {
 }
 
 impl<T: ListType> ListProp<'_, T> {
-    pub fn push(&mut self, name: impl Into<ObsString>, value: T) {
-        value.push_into(self.raw, name.into());
+    pub fn push(&mut self, name: &CStr, value: T) {
+        value.push_into(self.raw, name);
     }
 
-    pub fn insert(&mut self, index: usize, name: impl Into<ObsString>, value: T) {
-        value.insert_into(self.raw, name.into(), index);
+    pub fn insert(&mut self, index: usize, name: &CStr, value: T) {
+        value.insert_into(self.raw, name, index);
     }
 
     pub fn remove(&mut self, index: usize) {
@@ -179,22 +184,22 @@ impl<T: ListType> ListProp<'_, T> {
 
 pub trait ListType {
     fn format() -> ComboFormat;
-    fn push_into(self, ptr: *mut obs_property_t, name: ObsString);
-    fn insert_into(self, ptr: *mut obs_property_t, name: ObsString, index: usize);
+    fn push_into(self, ptr: *mut obs_property_t, name: &CStr);
+    fn insert_into(self, ptr: *mut obs_property_t, name: &CStr, index: usize);
 }
 
-impl ListType for ObsString {
+impl ListType for CString {
     fn format() -> ComboFormat {
         ComboFormat::String
     }
 
-    fn push_into(self, ptr: *mut obs_property_t, name: ObsString) {
+    fn push_into(self, ptr: *mut obs_property_t, name: &CStr) {
         unsafe {
             obs_property_list_add_string(ptr, name.as_ptr(), self.as_ptr());
         }
     }
 
-    fn insert_into(self, ptr: *mut obs_property_t, name: ObsString, index: usize) {
+    fn insert_into(self, ptr: *mut obs_property_t, name: &CStr, index: usize) {
         unsafe {
             obs_property_list_insert_string(ptr, index as size_t, name.as_ptr(), self.as_ptr());
         }
@@ -206,13 +211,13 @@ impl ListType for i64 {
         ComboFormat::Int
     }
 
-    fn push_into(self, ptr: *mut obs_property_t, name: ObsString) {
+    fn push_into(self, ptr: *mut obs_property_t, name: &CStr) {
         unsafe {
             obs_property_list_add_int(ptr, name.as_ptr(), self);
         }
     }
 
-    fn insert_into(self, ptr: *mut obs_property_t, name: ObsString, index: usize) {
+    fn insert_into(self, ptr: *mut obs_property_t, name: &CStr, index: usize) {
         unsafe {
             obs_property_list_insert_int(ptr, index as size_t, name.as_ptr(), self);
         }
@@ -224,13 +229,13 @@ impl ListType for f64 {
         ComboFormat::Float
     }
 
-    fn push_into(self, ptr: *mut obs_property_t, name: ObsString) {
+    fn push_into(self, ptr: *mut obs_property_t, name: &CStr) {
         unsafe {
             obs_property_list_add_float(ptr, name.as_ptr(), self);
         }
     }
 
-    fn insert_into(self, ptr: *mut obs_property_t, name: ObsString, index: usize) {
+    fn insert_into(self, ptr: *mut obs_property_t, name: &CStr, index: usize) {
         unsafe {
             obs_property_list_insert_float(ptr, index as size_t, name.as_ptr(), self);
         }
@@ -315,15 +320,15 @@ pub trait ObsProp {
     /// # Safety
     ///
     /// Must call with a valid pointer.
-    unsafe fn add_to_props(self, p: *mut obs_properties_t, name: ObsString, description: ObsString);
+    unsafe fn add_to_props(self, p: *mut obs_properties_t, name: &CStr, description: &CStr);
 }
 
 impl<T: ToPrimitive> ObsProp for NumberProp<T> {
     unsafe fn add_to_props(
         self,
         p: *mut obs_properties_t,
-        name: ObsString,
-        description: ObsString,
+        name: &CStr,
+        description: &CStr,
     ) {
         match self.typ {
             NumberType::Integer => {
@@ -379,8 +384,8 @@ impl ObsProp for BoolProp {
     unsafe fn add_to_props(
         self,
         p: *mut obs_properties_t,
-        name: ObsString,
-        description: ObsString,
+        name: &CStr,
+        description: &CStr,
     ) {
         obs_properties_add_bool(p, name.as_ptr(), description.as_ptr());
     }
@@ -399,8 +404,8 @@ impl ObsProp for TextProp {
     unsafe fn add_to_props(
         self,
         p: *mut obs_properties_t,
-        name: ObsString,
-        description: ObsString,
+        name: &CStr,
+        description: &CStr,
     ) {
         obs_properties_add_text(p, name.as_ptr(), description.as_ptr(), self.typ.into());
     }
@@ -412,8 +417,8 @@ impl ObsProp for ColorProp {
     unsafe fn add_to_props(
         self,
         p: *mut obs_properties_t,
-        name: ObsString,
-        description: ObsString,
+        name: &CStr,
+        description: &CStr,
     ) {
         obs_properties_add_color(p, name.as_ptr(), description.as_ptr());
     }
@@ -432,8 +437,8 @@ impl ObsProp for FontProp {
     unsafe fn add_to_props(
         self,
         p: *mut obs_properties_t,
-        name: ObsString,
-        description: ObsString,
+        name: &CStr,
+        description: &CStr,
     ) {
         obs_properties_add_font(p, name.as_ptr(), description.as_ptr());
     }
@@ -456,8 +461,8 @@ impl ObsProp for FontProp {
 ///   file types in a filter, separate with space.
 pub struct PathProp {
     typ: PathType,
-    filter: Option<ObsString>,
-    default_path: Option<ObsString>,
+    filter: Option<CString>,
+    default_path: Option<CString>,
 }
 
 impl PathProp {
@@ -469,13 +474,13 @@ impl PathProp {
         }
     }
 
-    pub fn with_filter(mut self, f: ObsString) -> Self {
-        self.filter = Some(f);
+    pub fn with_filter(mut self, f: impl Into<CString>) -> Self {
+        self.filter = Some(f.into());
         self
     }
 
-    pub fn with_default_path(mut self, d: ObsString) -> Self {
-        self.default_path = Some(d);
+    pub fn with_default_path(mut self, d: impl Into<CString>) -> Self {
+        self.default_path = Some(d.into());
         self
     }
 }
@@ -484,24 +489,24 @@ impl ObsProp for PathProp {
     unsafe fn add_to_props(
         self,
         p: *mut obs_properties_t,
-        name: ObsString,
-        description: ObsString,
+        name: &CStr,
+        description: &CStr,
     ) {
         obs_properties_add_path(
             p,
             name.as_ptr(),
             description.as_ptr(),
             self.typ.into(),
-            ObsString::ptr_or_null(&self.filter),
-            ObsString::ptr_or_null(&self.default_path),
+            ptr_or_null(self.filter.as_deref()),
+            ptr_or_null(self.default_path.as_deref()),
         );
     }
 }
 
 pub struct EditableListProp {
     typ: EditableListType,
-    filter: Option<ObsString>,
-    default_path: Option<ObsString>,
+    filter: Option<CString>,
+    default_path: Option<CString>,
 }
 
 impl EditableListProp {
@@ -513,13 +518,13 @@ impl EditableListProp {
         }
     }
 
-    pub fn with_filter(mut self, f: ObsString) -> Self {
-        self.filter = Some(f);
+    pub fn with_filter(mut self, f: impl Into<CString>) -> Self {
+        self.filter = Some(f.into());
         self
     }
 
-    pub fn with_default_path(mut self, d: ObsString) -> Self {
-        self.default_path = Some(d);
+    pub fn with_default_path(mut self, d: impl Into<CString>) -> Self {
+        self.default_path = Some(d.into());
         self
     }
 }
@@ -528,16 +533,16 @@ impl ObsProp for EditableListProp {
     unsafe fn add_to_props(
         self,
         p: *mut obs_properties_t,
-        name: ObsString,
-        description: ObsString,
+        name: &CStr,
+        description: &CStr,
     ) {
         obs_properties_add_editable_list(
             p,
             name.as_ptr(),
             description.as_ptr(),
             self.typ.into(),
-            ObsString::ptr_or_null(&self.filter),
-            ObsString::ptr_or_null(&self.default_path),
+            ptr_or_null(self.filter.as_deref()),
+            ptr_or_null(self.default_path.as_deref()),
         );
     }
 }

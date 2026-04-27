@@ -7,7 +7,6 @@ use obs_rs_sys::{
 };
 
 use crate::data::DataObj;
-use crate::string::DisplayExt as _;
 use crate::wrapper::PtrWrapper;
 
 use super::EncoderRef;
@@ -45,14 +44,14 @@ pub unsafe extern "C" fn create<D: Encodable>(
     let Some(settings) = DataObj::from_raw_unchecked(settings) else {
         log::error!(
             "obs handed null settings to encoder::create for `{}`; aborting create",
-            D::get_id().display()
+            D::get_id().to_string_lossy()
         );
         return std::ptr::null_mut();
     };
     let Some(encoder_ref) = EncoderRef::from_raw(encoder) else {
         log::error!(
             "obs handed null obs_encoder_t to encoder::create for `{}`; aborting create",
-            D::get_id().display()
+            D::get_id().to_string_lossy()
         );
         forget(settings);
         return std::ptr::null_mut();
@@ -61,7 +60,7 @@ pub unsafe extern "C" fn create<D: Encodable>(
     let data = match D::create(&mut ctx, encoder_ref) {
         Ok(d) => d,
         Err(e) => {
-            log::error!("encoder::create for `{}` failed: {}", D::get_id().display(), e);
+            log::error!("encoder::create for `{}` failed: {}", D::get_id().to_string_lossy(), e);
             forget(ctx.settings);
             return std::ptr::null_mut();
         }

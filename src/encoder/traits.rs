@@ -1,7 +1,8 @@
+use std::ffi::CStr;
+
 use crate::data::DataObj;
 use crate::properties::Properties;
 use crate::source::traits::CreateError;
-use crate::string::ObsString;
 
 use super::context::{
     CreatableEncoderContext, EncodeError, EncodeStatus, EncoderFrame, EncoderPacket,
@@ -11,13 +12,13 @@ use super::{EncoderRef, EncoderType};
 /// Required trait for any encoder. Identifies the encoder, names the codec,
 /// and constructs the per-instance state.
 pub trait Encodable: Sized {
-    /// Unique encoder id (`"obs_x264"`, `"my_h264_sei"`, ...). Must be a
-    /// `'static`-lifetime string — registered into a global table.
-    fn get_id() -> ObsString;
+    /// Unique encoder id (`"obs_x264"`, `"my_h264_sei"`, ...). Registered into
+    /// a global table.
+    fn get_id() -> &'static CStr;
 
     /// Codec the encoder produces (`"h264"`, `"hevc"`, `"av1"`, `"aac"`,
-    /// `"opus"`). Must be a `'static`-lifetime string.
-    fn get_codec() -> ObsString;
+    /// `"opus"`).
+    fn get_codec() -> &'static CStr;
 
     fn get_type() -> EncoderType;
 
@@ -28,7 +29,7 @@ pub trait Encodable: Sized {
 }
 
 pub trait GetNameEncoder {
-    fn get_name() -> ObsString;
+    fn get_name() -> &'static CStr;
 }
 
 pub trait UpdateEncoder: Sized {

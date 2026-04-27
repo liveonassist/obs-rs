@@ -30,6 +30,7 @@
 //! 1. Enable the traits which have been enabled in the module `load` method
 //!
 //! ~~~
+//! use std::ffi::CStr;
 //! use obs_rs::{
 //!     // Everything required for modules
 //!     prelude::*,
@@ -37,8 +38,6 @@
 //!     source::*,
 //!     // Macro for registering modules
 //!     obs_register_module,
-//!     // Macro for creating strings
-//!     obs_string,
 //! };
 //!
 //! // The module that will handle creating the source.
@@ -53,8 +52,8 @@
 //! // source.
 //! // It allows you to specify the source ID and type.
 //! impl Sourceable for TestSource {
-//!     fn get_id() -> ObsString {
-//!         obs_string!("test_source")
+//!     fn get_id() -> &'static CStr {
+//!         c"test_source"
 //!     }
 //!
 //!     fn get_type() -> SourceType {
@@ -71,8 +70,8 @@
 //!
 //! // Allow OBS to show a name for the source
 //! impl GetNameSource for TestSource {
-//!     fn get_name() -> ObsString {
-//!         obs_string!("Test Source")
+//!     fn get_name() -> &'static CStr {
+//!         c"Test Source"
 //!     }
 //! }
 //!
@@ -105,16 +104,16 @@
 //!         true
 //!     }
 //!
-//!     fn description() -> ObsString {
-//!         obs_string!("A great test module.")
+//!     fn description() -> &'static CStr {
+//!         c"A great test module."
 //!     }
 //!
-//!     fn name() -> ObsString {
-//!         obs_string!("Test Module")
+//!     fn name() -> &'static CStr {
+//!         c"Test Module"
 //!     }
 //!
-//!     fn author() -> ObsString {
-//!         obs_string!("Bennett")
+//!     fn author() -> &'static CStr {
+//!         c"Bennett"
 //!     }
 //! }
 //! ~~~
@@ -160,7 +159,7 @@ pub mod properties;
 pub mod result;
 /// Tools for creating sources
 pub mod source;
-/// String macros
+/// String helpers for interop with OBS C strings.
 pub mod string;
 
 mod native_enum;

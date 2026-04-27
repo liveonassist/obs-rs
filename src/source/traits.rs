@@ -1,3 +1,5 @@
+use std::ffi::CStr;
+
 use obs_rs_sys::{obs_key_event, obs_mouse_event};
 
 use super::context::{CreatableSourceContext, GlobalContext, VideoRenderContext};
@@ -6,7 +8,6 @@ use crate::data::DataObj;
 use crate::media::state::MediaState;
 use crate::media::{audio::AudioDataContext, video::VideoDataSourceContext};
 use crate::properties::Properties;
-use crate::string::ObsString;
 
 /// Boxed error type returned from fallible plugin entrypoints. Any error
 /// type the user prefers (`anyhow::Error`, `&'static str`, custom enums)
@@ -14,7 +15,7 @@ use crate::string::ObsString;
 pub type CreateError = Box<dyn std::error::Error + Send + Sync>;
 
 pub trait Sourceable: Sized {
-    fn get_id() -> ObsString;
+    fn get_id() -> &'static CStr;
     fn get_type() -> SourceType;
     fn create(
         create: &mut CreatableSourceContext<Self>,
@@ -39,7 +40,7 @@ macro_rules! simple_trait_ref {
 }
 
 pub trait GetNameSource {
-    fn get_name() -> ObsString;
+    fn get_name() -> &'static CStr;
 }
 
 simple_trait_ref!(

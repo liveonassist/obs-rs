@@ -1,6 +1,5 @@
 use super::{CreatableOutputContext, OutputRef, traits::*};
 use crate::hotkey::{Hotkey, HotkeyCallbacks};
-use crate::string::DisplayExt as _;
 use crate::{data::DataObj, wrapper::PtrWrapper};
 use obs_rs_sys::{
     audio_data, encoder_packet, obs_hotkey_id, obs_hotkey_register_output, obs_hotkey_t,
@@ -58,7 +57,7 @@ pub unsafe extern "C" fn create<D: Outputable>(
     let Some(settings) = DataObj::from_raw_unchecked(settings) else {
         log::error!(
             "obs handed null settings to output::create for `{}`; aborting create",
-            D::get_id().display()
+            D::get_id().to_string_lossy()
         );
         return std::ptr::null_mut();
     };
@@ -66,7 +65,7 @@ pub unsafe extern "C" fn create<D: Outputable>(
     let Some(output_context) = OutputRef::from_raw(output) else {
         log::error!(
             "obs handed null obs_output_t to output::create for `{}`; aborting create",
-            D::get_id().display()
+            D::get_id().to_string_lossy()
         );
         forget(context.settings);
         return std::ptr::null_mut();
@@ -75,7 +74,7 @@ pub unsafe extern "C" fn create<D: Outputable>(
     let data = match D::create(&mut context, output_context) {
         Ok(data) => data,
         Err(e) => {
-            log::error!("output::create for `{}` failed: {}", D::get_id().display(), e);
+            log::error!("output::create for `{}` failed: {}", D::get_id().to_string_lossy(), e);
             forget(context.settings);
             return std::ptr::null_mut();
         }

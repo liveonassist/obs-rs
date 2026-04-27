@@ -1,13 +1,14 @@
 use crate::encoder::{EncoderInfo, EncoderInfoBuilder, traits::Encodable};
 use crate::output::{OutputInfo, OutputInfoBuilder, traits::Outputable};
 use crate::source::{SourceInfo, SourceInfoBuilder, traits::Sourceable};
-use crate::string::{DisplayExt as _, ObsString, TryIntoObsString as _};
+use crate::string::cstring_from_ptr;
 use crate::{Error, Result};
 use obs_rs_sys::{
     obs_encoder_info, obs_get_module_author, obs_get_module_description, obs_get_module_file_name,
     obs_get_module_name, obs_module_t, obs_output_info, obs_register_encoder_s,
     obs_register_output_s, obs_register_source_s, obs_source_info, size_t,
 };
+use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 
 pub struct LoadContext {
@@ -93,9 +94,9 @@ pub trait Module {
     }
     fn unload(&mut self) {}
     fn post_load(&mut self) {}
-    fn description() -> ObsString;
-    fn name() -> ObsString;
-    fn author() -> ObsString;
+    fn description() -> &'static CStr;
+    fn name() -> &'static CStr;
+    fn author() -> &'static CStr;
 }
 
 #[macro_export]
@@ -183,10 +184,10 @@ pub struct ModuleRef {
 impl std::fmt::Debug for ModuleRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ModuleRef")
-            .field("name", &self.name().display())
-            .field("description", &self.description().display())
-            .field("author", &self.author().display())
-            .field("file_name", &self.file_name().display())
+            .field("name", &self.name())
+            .field("description", &self.description())
+            .field("author", &self.author())
+            .field("file_name", &self.file_name())
             .finish()
     }
 }
@@ -212,19 +213,23 @@ impl ModuleRef {
 }
 
 impl ModuleRef {
-    pub fn name(&self) -> Result<ObsString> {
-        unsafe { obs_get_module_name(self.raw) }.try_into_obs_string()
+    pub fn name(&self) -> Result<CString> {
+        unsafe { cstring_from_ptr(obs_get_module_name(self.raw)) }
+            .ok_or(Error::NulPointer("obs_get_module_name"))
     }
 
-    pub fn description(&self) -> Result<ObsString> {
-        unsafe { obs_get_module_description(self.raw) }.try_into_obs_string()
+    pub fn description(&self) -> Result<CString> {
+        unsafe { cstring_from_ptr(obs_get_module_description(self.raw)) }
+            .ok_or(Error::NulPointer("obs_get_module_description"))
     }
 
-    pub fn author(&self) -> Result<ObsString> {
-        unsafe { obs_get_module_author(self.raw) }.try_into_obs_string()
+    pub fn author(&self) -> Result<CString> {
+        unsafe { cstring_from_ptr(obs_get_module_author(self.raw)) }
+            .ok_or(Error::NulPointer("obs_get_module_author"))
     }
 
-    pub fn file_name(&self) -> Result<ObsString> {
-        unsafe { obs_get_module_file_name(self.raw) }.try_into_obs_string()
+    pub fn file_name(&self) -> Result<CString> {
+        unsafe { cstring_from_ptr(obs_get_module_file_name(self.raw)) }
+            .ok_or(Error::NulPointer("obs_get_module_file_name"))
     }
 }

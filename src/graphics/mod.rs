@@ -44,7 +44,6 @@ use std::{
 };
 use std::{os::raw::c_int, slice};
 
-use super::string::ObsString;
 
 /// Guard to guarantee that we exit graphics context properly.
 /// This does not prevent one from calling APIs that are not supposed to be
@@ -94,7 +93,7 @@ pub struct GraphicsEffect {
 }
 
 impl GraphicsEffect {
-    pub fn from_effect_string(value: ObsString, name: ObsString) -> Option<Self> {
+    pub fn from_effect_string(value: &CStr, name: &CStr) -> Option<Self> {
         let raw = GraphicsGuard::with_enter(|| unsafe {
             gs_effect_create(value.as_ptr(), name.as_ptr(), std::ptr::null_mut())
         });
@@ -107,7 +106,7 @@ impl GraphicsEffect {
 
     pub fn get_effect_param_by_name<T: TryFrom<GraphicsEffectParam>>(
         &mut self,
-        name: ObsString,
+        name: &CStr,
     ) -> Option<T> {
         unsafe {
             let pointer = gs_effect_get_param_by_name(self.raw, name.as_ptr());

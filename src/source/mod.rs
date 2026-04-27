@@ -7,9 +7,9 @@ pub mod scene;
 pub mod traits;
 
 use crate::{
-    Result,
+    Error, Result,
     media::state::MediaState,
-    string::{DisplayExt as _, TryIntoObsString},
+    string::cstring_from_ptr,
 };
 
 pub use context::*;
@@ -43,15 +43,15 @@ use obs_rs_sys::{
     obs_source_update,
 };
 
-use super::{
-    graphics::{
-        GraphicsAllowDirectRendering, GraphicsColorFormat, GraphicsEffect, GraphicsEffectContext,
-    },
-    string::ObsString,
+use super::graphics::{
+    GraphicsAllowDirectRendering, GraphicsColorFormat, GraphicsEffect, GraphicsEffectContext,
 };
 use crate::{data::DataObj, native_enum, wrapper::PtrWrapper};
 
-use std::{ffi::CString, marker::PhantomData};
+use std::{
+    ffi::{CStr, CString},
+    marker::PhantomData,
+};
 
 native_enum!(MouseButton, obs_mouse_button_type {
     Left => MOUSE_LEFT,
@@ -102,8 +102,8 @@ impl std::fmt::Debug for SourceRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SourceRef")
             .field("id", &self.id())
-            .field("name", &self.name().display())
-            .field("source_id", &self.source_id().display())
+            .field("name", &self.name())
+            .field("source_id", &self.source_id())
             .field("width", &self.width())
             .field("height", &self.height())
             .field("showing", &self.showing())
@@ -166,12 +166,14 @@ impl SourceRef {
         unsafe { obs_source_set_enabled(self.inner, enabled) }
     }
 
-    pub fn source_id(&self) -> Result<ObsString> {
-        unsafe { obs_source_get_id(self.inner) }.try_into_obs_string()
+    pub fn source_id(&self) -> Result<CString> {
+        unsafe { cstring_from_ptr(obs_source_get_id(self.inner)) }
+            .ok_or(Error::NulPointer("obs_source_get_id"))
     }
 
-    pub fn name(&self) -> Result<ObsString> {
-        unsafe { obs_source_get_name(self.inner) }.try_into_obs_string()
+    pub fn name(&self) -> Result<CString> {
+        unsafe { cstring_from_ptr(obs_source_get_name(self.inner)) }
+            .ok_or(Error::NulPointer("obs_source_get_name"))
     }
 
     pub fn set_name(&mut self, name: &str) {
@@ -290,7 +292,7 @@ impl SourceRef {
         (cx, cy): (u32, u32),
         format: GraphicsColorFormat,
         direct: GraphicsAllowDirectRendering,
-        technique: ObsString,
+        technique: &CStr,
         func: F,
     ) {
         unsafe {

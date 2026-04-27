@@ -1,7 +1,8 @@
+use std::ffi::CString;
+
 use crate::hotkey::{Hotkey, HotkeyCallbacks};
 use crate::media::audio::AudioRef;
 use crate::prelude::DataObj;
-use crate::string::ObsString;
 use obs_rs_sys::obs_get_audio;
 
 pub struct GlobalContext;
@@ -43,12 +44,12 @@ impl<'a, D> CreatableSourceContext<'a, D> {
 
     pub fn register_hotkey<F: FnMut(&mut Hotkey, &mut D) + 'static>(
         &mut self,
-        name: ObsString,
-        description: ObsString,
+        name: impl Into<CString>,
+        description: impl Into<CString>,
         func: F,
     ) {
         self.hotkey_callbacks
-            .push((name, description, Box::new(func)));
+            .push((name.into(), description.into(), Box::new(func)));
     }
 
     // Inherited from child contexts

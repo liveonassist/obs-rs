@@ -1,6 +1,7 @@
-use obs_rs::{obs_register_module, obs_rs_sys, obs_string, prelude::*, properties::*, source::*};
+use obs_rs::{obs_register_module, obs_rs_sys, prelude::*, properties::*, source::*};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::ffi::CStr;
 use std::path::PathBuf;
 use std::sync::atomic;
 
@@ -117,8 +118,8 @@ struct AvatarSource {
 }
 
 impl Sourceable for AvatarSource {
-    fn get_id() -> ObsString {
-        obs_string!("avatar_source")
+    fn get_id() -> &'static CStr {
+        c"avatar_source"
     }
 
     fn get_type() -> SourceType {
@@ -133,19 +134,19 @@ impl Sourceable for AvatarSource {
 
         // Получаем путь к директории аватара
         let avatar_path = settings
-            .get::<Cow<'_, str>>(obs_string!("avatar_path"))
+            .get::<Cow<'_, str>>(c"avatar_path")
             .map(|s| PathBuf::from(s.as_ref()))
             .unwrap_or_else(|| PathBuf::from("./assets/bongo_cat"));
 
         println!("Avatar path: {}", avatar_path.display());
-        let width = settings.get(obs_string!("width")).unwrap_or(1280);
-        let height = settings.get(obs_string!("height")).unwrap_or(768);
+        let width = settings.get(c"width").unwrap_or(1280);
+        let height = settings.get(c"height").unwrap_or(768);
         let speech_threshold = settings
-            .get(obs_string!("speech_threshold"))
+            .get(c"speech_threshold")
             .unwrap_or(0.15);
 
         let current_mode = settings
-            .get::<Cow<'_, str>>(obs_string!("mode"))
+            .get::<Cow<'_, str>>(c"mode")
             .map(|s| s.to_string())
             .unwrap_or_else(|| "keyboard".to_string());
 
@@ -254,8 +255,8 @@ impl Sourceable for AvatarSource {
 }
 
 impl GetNameSource for AvatarSource {
-    fn get_name() -> ObsString {
-        obs_string!("Avatar Source")
+    fn get_name() -> &'static CStr {
+        c"Avatar Source"
     }
 }
 
@@ -277,35 +278,35 @@ impl GetPropertiesSource for AvatarSource {
 
         // Path to avatar config.json
         properties.add(
-            obs_string!("avatar_path"),
-            obs_string!("Avatar JSON file"),
+            c"avatar_path",
+            c"Avatar JSON file",
             PathProp::new(PathType::File),
         );
 
         // Текущий режим (текстовое поле)
         properties.add(
-            obs_string!("mode"),
-            obs_string!("Current Mode (e.g., keyboard, standard)"),
+            c"mode",
+            c"Current Mode (e.g., keyboard, standard)",
             TextProp::new(TextType::Default),
         );
 
         // Размеры canvas
         properties.add(
-            obs_string!("width"),
-            obs_string!("Canvas Width"),
+            c"width",
+            c"Canvas Width",
             NumberProp::new_int().with_range(100u32..=3840),
         );
 
         properties.add(
-            obs_string!("height"),
-            obs_string!("Canvas Height"),
+            c"height",
+            c"Canvas Height",
             NumberProp::new_int().with_range(100u32..=2160),
         );
 
         // Порог для определения речи
         properties.add(
-            obs_string!("speech_threshold"),
-            obs_string!("Speech Detection Threshold"),
+            c"speech_threshold",
+            c"Speech Detection Threshold",
             NumberProp::new_float(0.01)
                 .with_range(0.0..=1.0)
                 .with_slider(),
@@ -313,8 +314,8 @@ impl GetPropertiesSource for AvatarSource {
 
         // Скорость анимации
         properties.add(
-            obs_string!("animation_speed"),
-            obs_string!("Animation Speed"),
+            c"animation_speed",
+            c"Animation Speed",
             NumberProp::new_float(0.1)
                 .with_range(0.1..=20.0)
                 .with_slider(),
@@ -327,7 +328,7 @@ impl GetPropertiesSource for AvatarSource {
 impl UpdateSource for AvatarSource {
     fn update(&mut self, settings: &mut DataObj, _context: &mut GlobalContext) {
         // Обновляем путь к аватару и перезагружаем если изменился
-        if let Some(path) = settings.get::<Cow<'_, str>>(obs_string!("avatar_path")) {
+        if let Some(path) = settings.get::<Cow<'_, str>>(c"avatar_path") {
             let new_path = PathBuf::from(path.as_ref());
             if new_path != self.avatar_path {
                 self.avatar_path = new_path.clone();
@@ -350,19 +351,19 @@ impl UpdateSource for AvatarSource {
         }
 
         // Обновляем текущий режим
-        if let Some(mode) = settings.get::<Cow<'_, str>>(obs_string!("mode")) {
+        if let Some(mode) = settings.get::<Cow<'_, str>>(c"mode") {
             self.current_mode = mode.to_string();
         }
 
-        if let Some(width) = settings.get(obs_string!("width")) {
+        if let Some(width) = settings.get(c"width") {
             self.width = width;
         }
 
-        if let Some(height) = settings.get(obs_string!("height")) {
+        if let Some(height) = settings.get(c"height") {
             self.height = height;
         }
 
-        if let Some(threshold) = settings.get(obs_string!("speech_threshold")) {
+        if let Some(threshold) = settings.get(c"speech_threshold") {
             self.speech_threshold = threshold;
         }
     }
@@ -728,18 +729,16 @@ impl Module for AvatarModule {
         println!("Avatar Plugin: Module unloaded successfully.");
     }
 
-    fn description() -> ObsString {
-        obs_string!(
-            "A virtual avatar with animated PNG parts that respond to keyboard, mouse, and audio input events."
-        )
+    fn description() -> &'static CStr {
+        c"A virtual avatar with animated PNG parts that respond to keyboard, mouse, and audio input events."
     }
 
-    fn name() -> ObsString {
-        obs_string!("Avatar Plugin")
+    fn name() -> &'static CStr {
+        c"Avatar Plugin"
     }
 
-    fn author() -> ObsString {
-        obs_string!("TakiMoysha")
+    fn author() -> &'static CStr {
+        c"TakiMoysha"
     }
 }
 

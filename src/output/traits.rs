@@ -1,15 +1,17 @@
+use std::ffi::CStr;
+
 use crate::encoder::context::EncodedPacketView;
 use crate::media::{
     audio::AudioDataOutputContext,
     video::VideoDataOutputContext,
 };
-use crate::{prelude::DataObj, properties::Properties, string::ObsString};
+use crate::{prelude::DataObj, properties::Properties};
 
 use super::{CreatableOutputContext, OutputRef};
 use crate::source::traits::CreateError;
 
 pub trait Outputable: Sized {
-    fn get_id() -> ObsString;
+    fn get_id() -> &'static CStr;
     fn create(
         context: &mut CreatableOutputContext<'_, Self>,
         output: OutputRef,
@@ -22,7 +24,7 @@ pub trait Outputable: Sized {
 }
 
 pub trait GetNameOutput {
-    fn get_name() -> ObsString;
+    fn get_name() -> &'static CStr;
 }
 
 pub trait RawVideoOutput: Sized {

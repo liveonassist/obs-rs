@@ -1,8 +1,6 @@
-use crate::{
-    source::SourceRef,
-    string::{DisplayExt as _, ObsString},
-    wrapper::PtrWrapper,
-};
+use std::ffi::CString;
+
+use crate::{source::SourceRef, wrapper::PtrWrapper};
 use obs_rs_sys::{
     obs_scene_add, obs_scene_get_ref, obs_scene_get_source, obs_scene_release, obs_scene_t,
     obs_sceneitem_addref, obs_sceneitem_release, obs_sceneitem_t, obs_sceneitem_visible,
@@ -17,7 +15,7 @@ pub struct SceneRef {
 impl std::fmt::Debug for SceneRef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("SceneRef")
-            .field(&self.name().display())
+            .field(&self.name())
             .field(&self.inner)
             .finish()
     }
@@ -26,7 +24,7 @@ impl std::fmt::Debug for SceneRef {
 impl_ptr_wrapper!(@ptr: inner, SceneRef, obs_scene_t, obs_scene_get_ref, obs_scene_release);
 
 impl SceneRef {
-    pub fn name(&self) -> Result<ObsString> {
+    pub fn name(&self) -> Result<CString> {
         self.as_source().name()
     }
 
