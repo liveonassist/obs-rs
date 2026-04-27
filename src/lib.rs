@@ -134,6 +134,8 @@ pub use obs_rs_sys;
 pub mod wrapper;
 /// `obs_data_t` handling
 pub mod data;
+/// Tools for creating encoders
+pub mod encoder;
 /// OBS Studio frontend API — UI-side controls for streaming, recording,
 /// scenes, transitions, profiles, save/load callbacks, etc.
 ///

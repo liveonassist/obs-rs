@@ -1,11 +1,12 @@
+use crate::encoder::{EncoderInfo, EncoderInfoBuilder, traits::Encodable};
 use crate::output::{OutputInfo, OutputInfoBuilder, traits::Outputable};
 use crate::source::{SourceInfo, SourceInfoBuilder, traits::Sourceable};
 use crate::string::{DisplayExt as _, ObsString, TryIntoObsString as _};
 use crate::{Error, Result};
 use obs_rs_sys::{
-    obs_get_module_author, obs_get_module_description, obs_get_module_file_name,
-    obs_get_module_name, obs_module_t, obs_output_info, obs_register_output_s,
-    obs_register_source_s, obs_source_info, size_t,
+    obs_encoder_info, obs_get_module_author, obs_get_module_description, obs_get_module_file_name,
+    obs_get_module_name, obs_module_t, obs_output_info, obs_register_encoder_s,
+    obs_register_output_s, obs_register_source_s, obs_source_info, size_t,
 };
 use std::marker::PhantomData;
 
@@ -13,6 +14,7 @@ pub struct LoadContext {
     __marker: PhantomData<()>,
     sources: Vec<*mut obs_source_info>,
     outputs: Vec<*mut obs_output_info>,
+    encoders: Vec<*mut obs_encoder_info>,
 }
 
 impl LoadContext {
@@ -24,6 +26,7 @@ impl LoadContext {
             __marker: PhantomData,
             sources: vec![],
             outputs: vec![],
+            encoders: vec![],
         }
     }
 
@@ -33,6 +36,10 @@ impl LoadContext {
 
     pub fn create_output_builder<D: Outputable>(&self) -> OutputInfoBuilder<D> {
         OutputInfoBuilder::new()
+    }
+
+    pub fn create_encoder_builder<D: Encodable>(&self) -> EncoderInfoBuilder<D> {
+        EncoderInfoBuilder::new()
     }
 
     pub fn register_source(&mut self, source: SourceInfo) {
@@ -51,6 +58,15 @@ impl LoadContext {
         };
         self.outputs.push(pointer);
     }
+
+    pub fn register_encoder(&mut self, encoder: EncoderInfo) {
+        let pointer = unsafe {
+            let pointer = encoder.into_raw();
+            obs_register_encoder_s(pointer, std::mem::size_of::<obs_encoder_info>() as size_t);
+            pointer
+        };
+        self.encoders.push(pointer);
+    }
 }
 
 impl Drop for LoadContext {
@@ -60,6 +76,9 @@ impl Drop for LoadContext {
                 drop(Box::from_raw(pointer))
             }
             for pointer in self.outputs.drain(..) {
+                drop(Box::from_raw(pointer))
+            }
+            for pointer in self.encoders.drain(..) {
                 drop(Box::from_raw(pointer))
             }
         }
