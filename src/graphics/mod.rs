@@ -44,7 +44,6 @@ use std::{
 };
 use std::{os::raw::c_int, slice};
 
-
 /// Guard to guarantee that we exit graphics context properly.
 /// This does not prevent one from calling APIs that are not supposed to be
 /// called outside of the context.

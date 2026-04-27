@@ -2,9 +2,7 @@ use std::ffi::c_void;
 use std::mem::forget;
 use std::os::raw::c_char;
 
-use obs_rs_sys::{
-    encoder_frame, encoder_packet, obs_data_t, obs_encoder_t, obs_properties,
-};
+use obs_rs_sys::{encoder_frame, encoder_packet, obs_data_t, obs_encoder_t, obs_properties};
 
 use crate::data::DataObj;
 use crate::wrapper::PtrWrapper;
@@ -60,7 +58,11 @@ pub unsafe extern "C" fn create<D: Encodable>(
     let data = match D::create(&mut ctx, encoder_ref) {
         Ok(d) => d,
         Err(e) => {
-            log::error!("encoder::create for `{}` failed: {}", D::get_id().to_string_lossy(), e);
+            log::error!(
+                "encoder::create for `{}` failed: {}",
+                D::get_id().to_string_lossy(),
+                e
+            );
             forget(ctx.settings);
             return std::ptr::null_mut();
         }
@@ -124,7 +126,14 @@ pub unsafe extern "C" fn encode_texture<D: EncodeTextureEncoder>(
         buffer: &mut wrapper.buffer,
     };
     pkt.reset();
-    match D::encode_texture(&mut wrapper.data, handle, pts, lock_key, &mut *next_key, &mut pkt) {
+    match D::encode_texture(
+        &mut wrapper.data,
+        handle,
+        pts,
+        lock_key,
+        &mut *next_key,
+        &mut pkt,
+    ) {
         Ok(EncodeStatus::Received) => {
             pkt_raw.data = wrapper.buffer.as_mut_ptr();
             pkt_raw.size = wrapper.buffer.len();

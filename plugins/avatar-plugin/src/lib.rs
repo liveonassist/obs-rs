@@ -141,9 +141,7 @@ impl Sourceable for AvatarSource {
         println!("Avatar path: {}", avatar_path.display());
         let width = settings.get(c"width").unwrap_or(1280);
         let height = settings.get(c"height").unwrap_or(768);
-        let speech_threshold = settings
-            .get(c"speech_threshold")
-            .unwrap_or(0.15);
+        let speech_threshold = settings.get(c"speech_threshold").unwrap_or(0.15);
 
         let current_mode = settings
             .get::<Cow<'_, str>>(c"mode")

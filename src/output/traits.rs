@@ -1,10 +1,7 @@
 use std::ffi::CStr;
 
 use crate::encoder::context::EncodedPacketView;
-use crate::media::{
-    audio::AudioDataOutputContext,
-    video::VideoDataOutputContext,
-};
+use crate::media::{audio::AudioDataOutputContext, video::VideoDataOutputContext};
 use crate::{prelude::DataObj, properties::Properties};
 
 use super::{CreatableOutputContext, OutputRef};

@@ -232,13 +232,13 @@ impl DataObj<'_> {
     /// Loads data into a object from a JSON file.
     /// * `backup_ext`: optional backup file path in case the original file is
     ///   bad.
-    pub fn from_json_file(
-        json_file: impl AsRef<CStr>,
-        backup_ext: Option<&CStr>,
-    ) -> Option<Self> {
+    pub fn from_json_file(json_file: impl AsRef<CStr>, backup_ext: Option<&CStr>) -> Option<Self> {
         unsafe {
             let raw = if let Some(backup_ext) = backup_ext {
-                obs_data_create_from_json_file_safe(json_file.as_ref().as_ptr(), backup_ext.as_ptr())
+                obs_data_create_from_json_file_safe(
+                    json_file.as_ref().as_ptr(),
+                    backup_ext.as_ptr(),
+                )
             } else {
                 obs_data_create_from_json_file(json_file.as_ref().as_ptr())
             };
@@ -273,11 +273,7 @@ impl DataObj<'_> {
     /// Notes
     /// -----
     /// Setting a default value for a [`DataArray`] is not supported and will panic.
-    pub fn set_default<T: FromDataItem>(
-        &mut self,
-        name: impl AsRef<CStr>,
-        value: impl Into<T>,
-    ) {
+    pub fn set_default<T: FromDataItem>(&mut self, name: impl AsRef<CStr>, value: impl Into<T>) {
         unsafe { T::set_default_unchecked(self.as_ptr_mut(), name.as_ref(), value.into()) }
     }
 

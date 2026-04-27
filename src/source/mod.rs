@@ -6,11 +6,7 @@ pub mod push;
 pub mod scene;
 pub mod traits;
 
-use crate::{
-    Error, Result,
-    media::state::MediaState,
-    string::cstring_from_ptr,
-};
+use crate::{Error, Result, media::state::MediaState, string::cstring_from_ptr};
 
 pub use context::*;
 pub use push::*;
@@ -18,16 +14,15 @@ pub use traits::*;
 
 use obs_rs_sys::{
     OBS_SOURCE_ASYNC_VIDEO, OBS_SOURCE_AUDIO, OBS_SOURCE_CONTROLLABLE_MEDIA,
-    OBS_SOURCE_INTERACTION, OBS_SOURCE_VIDEO,
-    obs_filter_get_target, obs_icon_type, obs_icon_type_OBS_ICON_TYPE_AUDIO_INPUT,
-    obs_icon_type_OBS_ICON_TYPE_AUDIO_OUTPUT, obs_icon_type_OBS_ICON_TYPE_BROWSER,
-    obs_icon_type_OBS_ICON_TYPE_CAMERA, obs_icon_type_OBS_ICON_TYPE_COLOR,
-    obs_icon_type_OBS_ICON_TYPE_CUSTOM, obs_icon_type_OBS_ICON_TYPE_DESKTOP_CAPTURE,
-    obs_icon_type_OBS_ICON_TYPE_GAME_CAPTURE, obs_icon_type_OBS_ICON_TYPE_IMAGE,
-    obs_icon_type_OBS_ICON_TYPE_MEDIA, obs_icon_type_OBS_ICON_TYPE_SLIDESHOW,
-    obs_icon_type_OBS_ICON_TYPE_TEXT, obs_icon_type_OBS_ICON_TYPE_UNKNOWN,
-    obs_icon_type_OBS_ICON_TYPE_WINDOW_CAPTURE, obs_mouse_button_type,
-    obs_mouse_button_type_MOUSE_LEFT, obs_mouse_button_type_MOUSE_MIDDLE,
+    OBS_SOURCE_INTERACTION, OBS_SOURCE_VIDEO, obs_filter_get_target, obs_icon_type,
+    obs_icon_type_OBS_ICON_TYPE_AUDIO_INPUT, obs_icon_type_OBS_ICON_TYPE_AUDIO_OUTPUT,
+    obs_icon_type_OBS_ICON_TYPE_BROWSER, obs_icon_type_OBS_ICON_TYPE_CAMERA,
+    obs_icon_type_OBS_ICON_TYPE_COLOR, obs_icon_type_OBS_ICON_TYPE_CUSTOM,
+    obs_icon_type_OBS_ICON_TYPE_DESKTOP_CAPTURE, obs_icon_type_OBS_ICON_TYPE_GAME_CAPTURE,
+    obs_icon_type_OBS_ICON_TYPE_IMAGE, obs_icon_type_OBS_ICON_TYPE_MEDIA,
+    obs_icon_type_OBS_ICON_TYPE_SLIDESHOW, obs_icon_type_OBS_ICON_TYPE_TEXT,
+    obs_icon_type_OBS_ICON_TYPE_UNKNOWN, obs_icon_type_OBS_ICON_TYPE_WINDOW_CAPTURE,
+    obs_mouse_button_type, obs_mouse_button_type_MOUSE_LEFT, obs_mouse_button_type_MOUSE_MIDDLE,
     obs_mouse_button_type_MOUSE_RIGHT, obs_source_active, obs_source_enabled,
     obs_source_get_base_height, obs_source_get_base_width, obs_source_get_height,
     obs_source_get_id, obs_source_get_name, obs_source_get_ref, obs_source_get_type,

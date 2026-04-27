@@ -123,7 +123,11 @@ pub unsafe extern "C" fn create<D: Sourceable>(
     let data = match D::create(&mut context, source_context) {
         Ok(data) => data,
         Err(e) => {
-            log::error!("source::create for `{}` failed: {}", D::get_id().to_string_lossy(), e);
+            log::error!(
+                "source::create for `{}` failed: {}",
+                D::get_id().to_string_lossy(),
+                e
+            );
             forget(context.settings);
             return std::ptr::null_mut();
         }

@@ -15,16 +15,17 @@
 //! [`Sourceable::create`]: super::Sourceable::create
 
 use obs_rs_sys::{
-    audio_format, audio_format_AUDIO_FORMAT_16BIT, audio_format_AUDIO_FORMAT_16BIT_PLANAR,
-    audio_format_AUDIO_FORMAT_32BIT, audio_format_AUDIO_FORMAT_32BIT_PLANAR,
-    audio_format_AUDIO_FORMAT_FLOAT, audio_format_AUDIO_FORMAT_FLOAT_PLANAR,
-    audio_format_AUDIO_FORMAT_U8BIT, audio_format_AUDIO_FORMAT_U8BIT_PLANAR, obs_source_audio,
-    obs_source_frame, obs_source_get_output_flags, obs_source_get_ref, obs_source_output_audio,
+    OBS_SOURCE_ASYNC_VIDEO, OBS_SOURCE_AUDIO, audio_format, audio_format_AUDIO_FORMAT_16BIT,
+    audio_format_AUDIO_FORMAT_16BIT_PLANAR, audio_format_AUDIO_FORMAT_32BIT,
+    audio_format_AUDIO_FORMAT_32BIT_PLANAR, audio_format_AUDIO_FORMAT_FLOAT,
+    audio_format_AUDIO_FORMAT_FLOAT_PLANAR, audio_format_AUDIO_FORMAT_U8BIT,
+    audio_format_AUDIO_FORMAT_U8BIT_PLANAR, obs_source_audio, obs_source_frame,
+    obs_source_get_output_flags, obs_source_get_ref, obs_source_output_audio,
     obs_source_output_video, obs_source_release, obs_source_t, speaker_layout,
     speaker_layout_SPEAKERS_2POINT1, speaker_layout_SPEAKERS_4POINT0,
-    speaker_layout_SPEAKERS_4POINT1, speaker_layout_SPEAKERS_5POINT1, speaker_layout_SPEAKERS_7POINT1,
-    speaker_layout_SPEAKERS_MONO, speaker_layout_SPEAKERS_STEREO, speaker_layout_SPEAKERS_UNKNOWN,
-    OBS_SOURCE_ASYNC_VIDEO, OBS_SOURCE_AUDIO,
+    speaker_layout_SPEAKERS_4POINT1, speaker_layout_SPEAKERS_5POINT1,
+    speaker_layout_SPEAKERS_7POINT1, speaker_layout_SPEAKERS_MONO, speaker_layout_SPEAKERS_STEREO,
+    speaker_layout_SPEAKERS_UNKNOWN,
 };
 
 use crate::media::video::VideoFormat;

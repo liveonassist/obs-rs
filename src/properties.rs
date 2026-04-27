@@ -90,12 +90,7 @@ impl Properties {
         }
     }
 
-    pub fn add<T: ObsProp>(
-        &mut self,
-        name: &CStr,
-        description: &CStr,
-        prop: T,
-    ) -> &mut Self {
+    pub fn add<T: ObsProp>(&mut self, name: &CStr, description: &CStr, prop: T) -> &mut Self {
         unsafe {
             prop.add_to_props(self.pointer, name, description);
         }
@@ -324,12 +319,7 @@ pub trait ObsProp {
 }
 
 impl<T: ToPrimitive> ObsProp for NumberProp<T> {
-    unsafe fn add_to_props(
-        self,
-        p: *mut obs_properties_t,
-        name: &CStr,
-        description: &CStr,
-    ) {
+    unsafe fn add_to_props(self, p: *mut obs_properties_t, name: &CStr, description: &CStr) {
         match self.typ {
             NumberType::Integer => {
                 let min: c_int = NumCast::from(self.min).unwrap();
@@ -381,12 +371,7 @@ impl<T: ToPrimitive> ObsProp for NumberProp<T> {
 pub struct BoolProp;
 
 impl ObsProp for BoolProp {
-    unsafe fn add_to_props(
-        self,
-        p: *mut obs_properties_t,
-        name: &CStr,
-        description: &CStr,
-    ) {
+    unsafe fn add_to_props(self, p: *mut obs_properties_t, name: &CStr, description: &CStr) {
         obs_properties_add_bool(p, name.as_ptr(), description.as_ptr());
     }
 }
@@ -401,12 +386,7 @@ impl TextProp {
 }
 
 impl ObsProp for TextProp {
-    unsafe fn add_to_props(
-        self,
-        p: *mut obs_properties_t,
-        name: &CStr,
-        description: &CStr,
-    ) {
+    unsafe fn add_to_props(self, p: *mut obs_properties_t, name: &CStr, description: &CStr) {
         obs_properties_add_text(p, name.as_ptr(), description.as_ptr(), self.typ.into());
     }
 }
@@ -414,12 +394,7 @@ impl ObsProp for TextProp {
 pub struct ColorProp;
 
 impl ObsProp for ColorProp {
-    unsafe fn add_to_props(
-        self,
-        p: *mut obs_properties_t,
-        name: &CStr,
-        description: &CStr,
-    ) {
+    unsafe fn add_to_props(self, p: *mut obs_properties_t, name: &CStr, description: &CStr) {
         obs_properties_add_color(p, name.as_ptr(), description.as_ptr());
     }
 }
@@ -434,12 +409,7 @@ impl ObsProp for ColorProp {
 pub struct FontProp;
 
 impl ObsProp for FontProp {
-    unsafe fn add_to_props(
-        self,
-        p: *mut obs_properties_t,
-        name: &CStr,
-        description: &CStr,
-    ) {
+    unsafe fn add_to_props(self, p: *mut obs_properties_t, name: &CStr, description: &CStr) {
         obs_properties_add_font(p, name.as_ptr(), description.as_ptr());
     }
 }
@@ -486,12 +456,7 @@ impl PathProp {
 }
 
 impl ObsProp for PathProp {
-    unsafe fn add_to_props(
-        self,
-        p: *mut obs_properties_t,
-        name: &CStr,
-        description: &CStr,
-    ) {
+    unsafe fn add_to_props(self, p: *mut obs_properties_t, name: &CStr, description: &CStr) {
         obs_properties_add_path(
             p,
             name.as_ptr(),
@@ -530,12 +495,7 @@ impl EditableListProp {
 }
 
 impl ObsProp for EditableListProp {
-    unsafe fn add_to_props(
-        self,
-        p: *mut obs_properties_t,
-        name: &CStr,
-        description: &CStr,
-    ) {
+    unsafe fn add_to_props(self, p: *mut obs_properties_t, name: &CStr, description: &CStr) {
         obs_properties_add_editable_list(
             p,
             name.as_ptr(),
