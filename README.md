@@ -13,10 +13,10 @@ plugins built on top of it.
 
 This crate supports the OBS Studio v30, v31, and v32 release lines. A single
 crate version targets a *range* of supported OBS versions; you pick which one
-to build against via a Cargo feature on `obs-wrapper` (and, on NixOS, the
+to build against via a Cargo feature on `obs-rs` (and, on NixOS, the
 matching dev shell).
 
-| `obs-wrapper` | `obs-sys` | OBS Studio line | Cargo feature       | Nix dev shell             |
+| `obs-rs` | `obs-rs-sys` | OBS Studio line | Cargo feature       | Nix dev shell             |
 | ------------- | --------- | --------------- | ------------------- | ------------------------- |
 | 0.5.x         | 0.4.x     | v30 (≥ 30.2.3)  | `obs-30`            | `nix develop .#obs-v30`   |
 | 0.5.x         | 0.4.x     | v31 (≥ 31.0.3)  | `obs-31`            | `nix develop .#obs-v31`   |
@@ -28,11 +28,11 @@ feature in your plugin's `Cargo.toml`:
 
 ```toml
 [dependencies]
-obs-wrapper = { version = "0.5", default-features = false, features = ["obs-31"] }
+obs-rs = { version = "0.5", default-features = false, features = ["obs-31"] }
 ```
 
-`obs-sys`'s `build.rs` hard-errors if the selected feature doesn't match the
-OBS major version checked out in `obs-sys/obs-v{N}`, or — when detectable —
+`obs-rs-sys`'s `build.rs` hard-errors if the selected feature doesn't match the
+OBS major version checked out in `obs-rs-sys/obs-v{N}`, or — when detectable —
 the major version of the libobs your machine will link against. Detection
 sources, in order: `OBS_LIBRARY_MAJOR_VER` env var (always honored); on Linux
 `pkg-config --modversion libobs` then `libobs.so.<major>` symlinks under
@@ -44,8 +44,8 @@ the OBS Studio uninstall registry key.
 
 | Path                       | Description                                       |
 | -------------------------- | ------------------------------------------------- |
-| `/`                        | `obs-wrapper` — the safe Rust wrapper crate       |
-| `/obs-sys`                 | Raw `bindgen` bindings against `<obs/obs.h>`      |
+| `/`                        | `obs-rs` — the safe Rust wrapper crate       |
+| `/obs-rs-sys`                 | Raw `bindgen` bindings against `<obs/obs.h>`      |
 | `/plugins/avatar-plugin`   | Renders an avatar driven by keyboard/mouse input  |
 | `/scripts`                 | Python helpers (`obsws-python`) for OBS testing   |
 
@@ -56,7 +56,7 @@ Add the wrapper to your plugin crate's `Cargo.toml`, replacing
 
 ```toml
 [dependencies]
-obs-wrapper = "0.4"
+obs-rs = "0.4"
 
 [lib]
 name = "<module-name>"
@@ -185,7 +185,7 @@ check your install for the right location.
 The repo ships a Nix flake with one dev shell per supported OBS major. Each
 shell pins both the libraries (`libobs`, `libobs-frontend-api`) and the
 matching `obs-studio` package version, plus the rust toolchain and
-`libclang` for `obs-sys` bindgen:
+`libclang` for `obs-rs-sys` bindgen:
 
 ```sh
 cp .envrc.template .envrc          # if you use direnv
@@ -195,31 +195,31 @@ nix develop .#obs-v31              # target OBS v31
 nix develop .#obs-v32              # target OBS v32 (also the default)
 ```
 
-Each shell exports `OBS_LIBRARY_MAJOR_VER=<N>` so `obs-sys`'s build script can
+Each shell exports `OBS_LIBRARY_MAJOR_VER=<N>` so `obs-rs-sys`'s build script can
 verify the linked libobs matches the selected `obs-XX` feature without you
 having to think about it.
 
-OBS **headers** come from per-version git submodules under `obs-sys/`, not
+OBS **headers** come from per-version git submodules under `obs-rs-sys/`, not
 from nixpkgs — the submodule pin is the OBS version this repo builds
 against. Each major has its own pinned submodule:
 
 ```sh
-git submodule update --init obs-sys/obs-v30          # only v30
-git submodule update --init obs-sys/obs-v31          # only v31
-git submodule update --init obs-sys/obs-v32          # only v32
+git submodule update --init obs-rs-sys/obs-v30          # only v30
+git submodule update --init obs-rs-sys/obs-v31          # only v31
+git submodule update --init obs-rs-sys/obs-v32          # only v32
 git submodule update --init --recursive              # all three
 ```
 
 To bump a major's pin to a newer release in the same line:
 
 ```sh
-git -C obs-sys/obs-v32 fetch --tags
-git -C obs-sys/obs-v32 checkout <tag>                 # e.g. 32.1.3
-git add obs-sys/obs-v32 && git commit
+git -C obs-rs-sys/obs-v32 fetch --tags
+git -C obs-rs-sys/obs-v32 checkout <tag>                 # e.g. 32.1.3
+git add obs-rs-sys/obs-v32 && git commit
 ```
 
 If the submodule for the *default* major (`obs-v32`) isn't checked out,
-`obs-sys`'s `build.rs` falls back to its pre-generated bindings — fine for
+`obs-rs-sys`'s `build.rs` falls back to its pre-generated bindings — fine for
 casual builds, but the compatibility table above only applies to the pinned
 submodule revision. Non-default majors (`obs-30`, `obs-31`) require their
 submodule to be initialized; there is no fallback for them.

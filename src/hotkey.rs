@@ -1,4 +1,4 @@
-use obs_sys::{obs_hotkey_get_id, obs_hotkey_id, obs_hotkey_t};
+use obs_rs_sys::{obs_hotkey_get_id, obs_hotkey_id, obs_hotkey_t};
 
 use crate::string::ObsString;
 

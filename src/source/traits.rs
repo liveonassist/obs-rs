@@ -1,4 +1,4 @@
-use obs_sys::{obs_key_event, obs_mouse_event};
+use obs_rs_sys::{obs_key_event, obs_mouse_event};
 
 use super::context::{CreatableSourceContext, GlobalContext, VideoRenderContext};
 use super::{EnumActiveContext, EnumAllContext, SourceRef, SourceType};

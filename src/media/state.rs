@@ -1,4 +1,4 @@
-use obs_sys::{
+use obs_rs_sys::{
     obs_media_state, obs_media_state_OBS_MEDIA_STATE_BUFFERING,
     obs_media_state_OBS_MEDIA_STATE_ENDED, obs_media_state_OBS_MEDIA_STATE_ERROR,
     obs_media_state_OBS_MEDIA_STATE_NONE, obs_media_state_OBS_MEDIA_STATE_OPENING,

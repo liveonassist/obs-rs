@@ -3,7 +3,7 @@ use crate::{
     string::{DisplayExt as _, ObsString},
     wrapper::PtrWrapper,
 };
-use obs_sys::{
+use obs_rs_sys::{
     obs_scene_add, obs_scene_get_ref, obs_scene_get_source, obs_scene_release, obs_scene_t,
     obs_sceneitem_addref, obs_sceneitem_release, obs_sceneitem_t, obs_sceneitem_visible,
 };

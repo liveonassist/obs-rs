@@ -1,4 +1,4 @@
-use obs_sys::{audio_data, encoder_packet, video_data};
+use obs_rs_sys::{audio_data, encoder_packet, video_data};
 
 use crate::{prelude::DataObj, properties::Properties, string::ObsString};
 

@@ -16,7 +16,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! obs-wrapper = "0.1"
+//! obs-rs = "0.1"
 //!
 //! [lib]
 //! name = "<module-name>"
@@ -30,7 +30,7 @@
 //! 1. Enable the traits which have been enabled in the module `load` method
 //!
 //! ~~~
-//! use obs_wrapper::{
+//! use obs_rs::{
 //!     // Everything required for modules
 //!     prelude::*,
 //!     // Everything required for creating a source
@@ -127,7 +127,7 @@
 //! 3. The plugin should be available for use from inside OBS
 
 /// Raw bindings of OBS C API
-pub use obs_sys;
+pub use obs_rs_sys;
 
 /// FFI pointer wrapper
 #[macro_use]

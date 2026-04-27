@@ -14,7 +14,7 @@ use crate::{
 pub use context::*;
 pub use traits::*;
 
-use obs_sys::{
+use obs_rs_sys::{
     OBS_SOURCE_AUDIO, OBS_SOURCE_CONTROLLABLE_MEDIA, OBS_SOURCE_INTERACTION, OBS_SOURCE_VIDEO,
     obs_filter_get_target, obs_icon_type, obs_icon_type_OBS_ICON_TYPE_AUDIO_INPUT,
     obs_icon_type_OBS_ICON_TYPE_AUDIO_OUTPUT, obs_icon_type_OBS_ICON_TYPE_BROWSER,

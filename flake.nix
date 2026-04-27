@@ -47,7 +47,7 @@
         pkgsObsV32 = importPinned nixpkgs-master;
 
         # nixpkgs's obs-studio is linux-only. On darwin we expect the user (or
-        # CI) to install OBS.app into /Applications; obs-sys/build_mac.rs
+        # CI) to install OBS.app into /Applications; obs-rs-sys/build_mac.rs
         # already finds libobs / obs-frontend-api there. Gate the attribute
         # access behind the platform check so we don't trip the platform
         # assertion when evaluating the flake on darwin.
@@ -77,7 +77,7 @@
                 # Rust
                 rustToolchain
 
-                # bindgen / obs-sys build deps
+                # bindgen / obs-rs-sys build deps
                 llvmPackages.libclang
                 pkg-config
 
@@ -95,16 +95,16 @@
                 uv
               ]
               # OBS — provides libobs + obs-frontend-api .so files for linking
-              # on Linux. Headers come from obs-sys/obs-v${toString major} so
+              # on Linux. Headers come from obs-rs-sys/obs-v${toString major} so
               # the version we build against is tracked in git, not coupled to
               # whatever nixpkgs ships. On darwin the package isn't available
-              # in nixpkgs; obs-sys/build_mac.rs locates libobs in
+              # in nixpkgs; obs-rs-sys/build_mac.rs locates libobs in
               # /Applications/OBS.app instead.
               ++ pkgs.lib.optional (obsPkg != null) obsPkg;
 
             LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
 
-            # Consumed by obs-sys/build.rs to assert the linked libobs major
+            # Consumed by obs-rs-sys/build.rs to assert the linked libobs major
             # matches the selected `obs-${major}` Cargo feature.
             OBS_LIBRARY_MAJOR_VER = toString major;
 
@@ -135,12 +135,12 @@
                 then ''echo "  - 🔗 Linking against obs-studio ${obsPkg.version}"''
                 else ''echo "  - 🔗 Linking against /Applications/OBS.app (install OBS v${toString major}.x manually — see build_mac.rs)"''
               }
-              if [ -f obs-sys/obs-v${toString major}/libobs/obs-config.h ]; then
-                submodule_rev="$(git -C obs-sys/obs-v${toString major} rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
-                echo "  - 📌 Headers from obs-sys/obs-v${toString major} submodule @ $submodule_rev"
+              if [ -f obs-rs-sys/obs-v${toString major}/libobs/obs-config.h ]; then
+                submodule_rev="$(git -C obs-rs-sys/obs-v${toString major} rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
+                echo "  - 📌 Headers from obs-rs-sys/obs-v${toString major} submodule @ $submodule_rev"
               else
-                echo "  - ⚠️  obs-sys/obs-v${toString major} submodule not initialized"
-                echo "       run: git submodule update --init obs-sys/obs-v${toString major}"
+                echo "  - ⚠️  obs-rs-sys/obs-v${toString major} submodule not initialized"
+                echo "       run: git submodule update --init obs-rs-sys/obs-v${toString major}"
               fi
               echo ""
               echo "Build with:"

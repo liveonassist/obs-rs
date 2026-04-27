@@ -2,7 +2,7 @@ use paste::item;
 
 use std::marker::PhantomData;
 
-use obs_sys::{
+use obs_rs_sys::{
     OBS_OUTPUT_AUDIO, OBS_OUTPUT_ENCODED, OBS_OUTPUT_MULTI_TRACK, OBS_OUTPUT_VIDEO, obs_output_info,
 };
 

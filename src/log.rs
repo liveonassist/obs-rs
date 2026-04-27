@@ -1,7 +1,7 @@
 use std::os::raw::c_char;
 
 use log::{Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
-use obs_sys::{_bindgen_ty_1, LOG_DEBUG, LOG_ERROR, LOG_INFO, LOG_WARNING, blog};
+use obs_rs_sys::{_bindgen_ty_1, LOG_DEBUG, LOG_ERROR, LOG_INFO, LOG_WARNING, blog};
 
 /// A logger that plugs into OBS's logging system.
 ///

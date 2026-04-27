@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.95.0"
 
 [dependencies]
-obs-wrapper = { path = "../..", default-features = false }
+obs-rs = { path = "../..", default-features = false }
 image = "0.25"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -46,10 +46,10 @@ x11 = []            # Linux X11 input capture
 wayland = ["evdev"] # Linux Wayland input capture (requires evdev)
 
 # Pass-through OBS major-version selectors. Must match the version selected
-# on obs-wrapper for the workspace build to resolve cleanly.
-obs-30 = ["obs-wrapper/obs-30"]
-obs-31 = ["obs-wrapper/obs-31"]
-obs-32 = ["obs-wrapper/obs-32"]
+# on obs-rs for the workspace build to resolve cleanly.
+obs-30 = ["obs-rs/obs-30"]
+obs-31 = ["obs-rs/obs-31"]
+obs-32 = ["obs-rs/obs-32"]
 
 [lib]
 name = "avatarplugin"
