@@ -1,4 +1,4 @@
-# rust-obs-plugins
+# obs-rs
 
 > Forked from [TakiMoysha/rust-obs-plugins](https://github.com/TakiMoysha/rust-obs-plugins),
 > which was forked from [bennetthardwick/rust-obs-plugins](https://github.com/bennetthardwick/rust-obs-plugins).
@@ -12,15 +12,15 @@ plugins built on top of it.
 ## Compatibility
 
 This crate supports the OBS Studio v30, v31, and v32 release lines. A single
-crate version targets a *range* of supported OBS versions; you pick which one
+crate version targets a _range_ of supported OBS versions; you pick which one
 to build against via a Cargo feature on `obs-rs` (and, on NixOS, the
 matching dev shell).
 
-| `obs-rs` | `obs-rs-sys` | OBS Studio line | Cargo feature       | Nix dev shell             |
-| ------------- | --------- | --------------- | ------------------- | ------------------------- |
-| 0.5.x         | 0.4.x     | v30 (≥ 30.2.3)  | `obs-30`            | `nix develop .#obs-v30`   |
-| 0.5.x         | 0.4.x     | v31 (≥ 31.0.3)  | `obs-31`            | `nix develop .#obs-v31`   |
-| 0.5.x         | 0.4.x     | v32 (≥ 32.1.0)  | `obs-32` (default)  | `nix develop` (= `obs-v32`) |
+| `obs-rs` | `obs-rs-sys` | OBS Studio line | Cargo feature      | Nix dev shell               |
+| -------- | ------------ | --------------- | ------------------ | --------------------------- |
+| 0.5.x    | 0.4.x        | v30 (≥ 30.2.3)  | `obs-30`           | `nix develop .#obs-v30`     |
+| 0.5.x    | 0.4.x        | v31 (≥ 31.0.3)  | `obs-31`           | `nix develop .#obs-v31`     |
+| 0.5.x    | 0.4.x        | v32 (≥ 32.1.0)  | `obs-32` (default) | `nix develop` (= `obs-v32`) |
 
 The default feature is `obs-32` — the latest stable OBS major. To build against
 an older major, set `default-features = false` and pick exactly one `obs-XX`
@@ -42,12 +42,12 @@ the OBS Studio uninstall registry key.
 
 ## Repository layout
 
-| Path                       | Description                                       |
-| -------------------------- | ------------------------------------------------- |
-| `/`                        | `obs-rs` — the safe Rust wrapper crate       |
-| `/obs-rs-sys`                 | Raw `bindgen` bindings against `<obs/obs.h>`      |
-| `/plugins/avatar-plugin`   | Renders an avatar driven by keyboard/mouse input  |
-| `/scripts`                 | Python helpers (`obsws-python`) for OBS testing   |
+| Path                     | Description                                      |
+| ------------------------ | ------------------------------------------------ |
+| `/`                      | `obs-rs` — the safe Rust wrapper crate           |
+| `/obs-rs-sys`            | Raw `bindgen` bindings against `<obs/obs.h>`     |
+| `/plugins/avatar-plugin` | Renders an avatar driven by keyboard/mouse input |
+| `/scripts`               | Python helpers (`obsws-python`) for OBS testing  |
 
 ## Usage
 
@@ -122,26 +122,26 @@ obs_register_module!(TestModule);
 Each trait must be enabled on the source builder via the matching
 `.enable_*()` call so OBS sees the corresponding callback.
 
-| Trait                 | Description                                   | Builder method             |
-| :-------------------- | :-------------------------------------------- | :------------------------- |
-| `GetNameSource`       | Display name of the source                    | `.enable_get_name()`       |
-| `GetWidthSource`      | Source width                                  | `.enable_get_width()`      |
-| `GetHeightSource`     | Source height                                 | `.enable_get_height()`     |
-| `VideoRenderSource`   | Video rendering                               | `.enable_video_render()`   |
-| `AudioRenderSource`   | Audio rendering                               | `.enable_audio_render()`   |
-| `UpdateSource`        | Settings updated                              | `.enable_update()`         |
-| `GetPropertiesSource` | Define user-configurable properties           | `.enable_get_properties()` |
-| `GetDefaultsSource`   | Default values for settings                   | `.enable_get_defaults()`   |
-| `VideoTickSource`     | Per-video-frame tick                          | `.enable_video_tick()`     |
-| `ActivateSource`      | Source becomes active                         | `.enable_activate()`       |
-| `DeactivateSource`    | Source becomes inactive                       | `.enable_deactivate()`     |
-| `MouseClickSource`    | Mouse clicks                                  | `.enable_mouse_click()`    |
-| `MouseMoveSource`     | Mouse movement                                | `.enable_mouse_move()`     |
-| `MouseWheelSource`    | Mouse wheel                                   | `.enable_mouse_wheel()`    |
-| `KeyClickSource`      | Keyboard events                               | `.enable_key_click()`      |
-| `FocusSource`         | Focus changes                                 | `.enable_focus()`          |
-| `FilterVideoSource`   | Filter: process video data                    | `.enable_filter_video()`   |
-| `FilterAudioSource`   | Filter: process audio data                    | `.enable_filter_audio()`   |
+| Trait                 | Description                         | Builder method             |
+| :-------------------- | :---------------------------------- | :------------------------- |
+| `GetNameSource`       | Display name of the source          | `.enable_get_name()`       |
+| `GetWidthSource`      | Source width                        | `.enable_get_width()`      |
+| `GetHeightSource`     | Source height                       | `.enable_get_height()`     |
+| `VideoRenderSource`   | Video rendering                     | `.enable_video_render()`   |
+| `AudioRenderSource`   | Audio rendering                     | `.enable_audio_render()`   |
+| `UpdateSource`        | Settings updated                    | `.enable_update()`         |
+| `GetPropertiesSource` | Define user-configurable properties | `.enable_get_properties()` |
+| `GetDefaultsSource`   | Default values for settings         | `.enable_get_defaults()`   |
+| `VideoTickSource`     | Per-video-frame tick                | `.enable_video_tick()`     |
+| `ActivateSource`      | Source becomes active               | `.enable_activate()`       |
+| `DeactivateSource`    | Source becomes inactive             | `.enable_deactivate()`     |
+| `MouseClickSource`    | Mouse clicks                        | `.enable_mouse_click()`    |
+| `MouseMoveSource`     | Mouse movement                      | `.enable_mouse_move()`     |
+| `MouseWheelSource`    | Mouse wheel                         | `.enable_mouse_wheel()`    |
+| `KeyClickSource`      | Keyboard events                     | `.enable_key_click()`      |
+| `FocusSource`         | Focus changes                       | `.enable_focus()`          |
+| `FilterVideoSource`   | Filter: process video data          | `.enable_filter_video()`   |
+| `FilterAudioSource`   | Filter: process audio data          | `.enable_filter_audio()`   |
 
 ### Property types (`GetPropertiesSource`)
 
@@ -171,11 +171,11 @@ cargo build --release
 
 Then copy the resulting shared library into OBS's plugins directory:
 
-| Platform | Library      | Install location                    |
-| -------- | ------------ | ----------------------------------- |
-| Linux    | `*.so`       | `/usr/lib/obs-plugins/`             |
-| macOS    | `*.dylib`    | `~/Library/Application Support/obs-studio/plugins/` |
-| Windows  | `*.dll`      | `%PROGRAMFILES%\obs-studio\obs-plugins\64bit\` |
+| Platform | Library   | Install location                                    |
+| -------- | --------- | --------------------------------------------------- |
+| Linux    | `*.so`    | `/usr/lib/obs-plugins/`                             |
+| macOS    | `*.dylib` | `~/Library/Application Support/obs-studio/plugins/` |
+| Windows  | `*.dll`   | `%PROGRAMFILES%\obs-studio\obs-plugins\64bit\`      |
 
 Plugin paths vary by OBS install method (Flatpak, Snap, portable, etc.) —
 check your install for the right location.
@@ -218,7 +218,7 @@ git -C obs-rs-sys/obs-v32 checkout <tag>                 # e.g. 32.1.3
 git add obs-rs-sys/obs-v32 && git commit
 ```
 
-If the submodule for the *default* major (`obs-v32`) isn't checked out,
+If the submodule for the _default_ major (`obs-v32`) isn't checked out,
 `obs-rs-sys`'s `build.rs` falls back to its pre-generated bindings — fine for
 casual builds, but the compatibility table above only applies to the pinned
 submodule revision. Non-default majors (`obs-30`, `obs-31`) require their
