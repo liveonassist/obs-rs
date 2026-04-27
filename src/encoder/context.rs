@@ -4,10 +4,16 @@ use crate::data::DataObj;
 
 use super::EncoderType;
 
-/// Settings handed to [`Encodable::create`].
+/// Construction-time context handed to [`Encodable::create`].
+///
+/// Carries the initial [`DataObj`] settings supplied by OBS when an encoder
+/// instance is being created. The type parameter `D` is the implementing
+/// encoder type, used to keep callbacks routed to the correct `Encodable`
+/// implementation.
 ///
 /// [`Encodable::create`]: super::Encodable::create
 pub struct CreatableEncoderContext<'a, D> {
+    /// Initial encoder settings.
     pub settings: DataObj<'a>,
     pub(crate) _marker: std::marker::PhantomData<fn() -> D>,
 }
@@ -21,8 +27,14 @@ impl<'a, D> CreatableEncoderContext<'a, D> {
     }
 }
 
-/// Borrowed view over an `encoder_frame` from libobs. Read-only — encoders
-/// don't get to mutate the input.
+/// A borrowed, read-only view of an input frame supplied by OBS.
+///
+/// `EncoderFrame` exposes the planes, line strides, frame count, and
+/// presentation timestamp of an input buffer that libobs is asking the
+/// encoder to consume. The underlying memory is owned by OBS and is only
+/// valid for the duration of the [`EncodeEncoder::encode`] call.
+///
+/// [`EncodeEncoder::encode`]: super::traits::EncodeEncoder::encode
 pub struct EncoderFrame<'a> {
     raw: &'a obs_rs_sys::encoder_frame,
 }
@@ -32,128 +44,161 @@ impl<'a> EncoderFrame<'a> {
         Self { raw }
     }
 
-    /// Pointer to plane `idx` (0..8). Use [`plane`](Self::plane) for a slice
-    /// view if you know the plane size.
+    /// Returns a raw pointer to plane `idx`. Up to 8 planes may be present
+    /// (`0..8`); empty planes return a null pointer.
+    ///
+    /// Prefer [`plane`](Self::plane) when you can compute the plane size
+    /// up front.
     pub fn plane_ptr(&self, idx: usize) -> *const u8 {
         self.raw.data[idx]
     }
 
-    /// Slice over plane `idx`. The caller specifies `len`: video planes are
-    /// `linesize * height_for_plane`; audio is `frames * bytes_per_sample`
-    /// (per channel for planar formats).
+    /// Returns plane `idx` as a byte slice of length `len`.
+    ///
+    /// For video planes, `len` is typically `linesize * height_for_plane`;
+    /// for audio, `frames * bytes_per_sample` (per channel for planar
+    /// formats).
     ///
     /// # Safety
-    /// `len` must not exceed the plane's actual length, and the slice must
-    /// not be aliased mutably elsewhere.
+    ///
+    /// `len` must not exceed the plane's actual length, and no other live
+    /// reference may alias this region for the lifetime of the returned
+    /// slice.
     pub unsafe fn plane(&self, idx: usize, len: usize) -> &'a [u8] {
         std::slice::from_raw_parts(self.raw.data[idx], len)
     }
 
+    /// Returns the row stride in bytes for plane `idx`.
     pub fn linesize(&self, idx: usize) -> u32 {
         self.raw.linesize[idx]
     }
 
-    /// Audio-only: number of audio frames in this buffer.
+    /// Returns the number of audio frames in this buffer (audio only).
     pub fn frames(&self) -> u32 {
         self.raw.frames
     }
 
+    /// Returns the presentation timestamp of this frame, in the encoder's
+    /// timebase.
     pub fn pts(&self) -> i64 {
         self.raw.pts
     }
 }
 
-/// Result of an encode call.
+/// The outcome of a single encode call.
 #[derive(Debug, Clone, Copy)]
 pub enum EncodeStatus {
     /// A packet was produced and written into the [`EncoderPacket`].
     Received,
-    /// No packet this call (encoder is buffering).
+    /// No packet was produced this call. The encoder is still buffering
+    /// input and is not yet ready to emit output.
     NotReady,
 }
 
-/// Boxed error type returned from [`EncodeEncoder::encode`] /
-/// [`EncodeTextureEncoder::encode_texture`]. Same shape as `CreateError` —
-/// any `Display + Send + Sync` error converts via `Into`.
+/// The error type returned from encode callbacks.
+///
+/// Any `Display + Send + Sync` error type converts into `EncodeError` via
+/// the standard `Into` impl, mirroring [`CreateError`](crate::source::traits::CreateError).
 ///
 /// [`EncodeEncoder::encode`]: super::traits::EncodeEncoder::encode
 /// [`EncodeTextureEncoder::encode_texture`]: super::traits::EncodeTextureEncoder::encode_texture
 pub type EncodeError = Box<dyn std::error::Error + Send + Sync>;
 
-/// A typed view onto the `encoder_packet` libobs handed us, plus a
-/// per-encoder owned buffer the user writes payload bytes into.
+/// A mutable view of the packet OBS is filling, paired with the
+/// encoder-owned payload buffer.
 ///
-/// The buffer is owned by the encoder wrapper (one `Vec<u8>` per encoder
-/// instance, reused across calls). Each call should:
-/// 1. [`reset`](Self::reset) the buffer.
-/// 2. Set timestamps via [`set_pts`](Self::set_pts) / [`set_dts`](Self::set_dts) /
-///    [`set_keyframe`](Self::set_keyframe) and any other fields.
-/// 3. Append payload bytes via [`write`](Self::write) (or [`writer`](Self::writer)
-///    for `Vec`-style construction).
-/// 4. Return [`EncodeStatus::Received`].
+/// The payload buffer is reused across calls (one `Vec<u8>` per encoder
+/// instance). A typical encode callback:
 ///
-/// On return the FFI shim points `encoder_packet.data` at the buffer; OBS
-/// reads it before the next encode call, then drops its reference.
+/// 1. Calls [`reset`](Self::reset) to clear the previous payload.
+/// 2. Sets timestamps and codec metadata with [`set_pts`](Self::set_pts),
+///    [`set_dts`](Self::set_dts), [`set_keyframe`](Self::set_keyframe), and
+///    related setters.
+/// 3. Appends payload bytes via [`write`](Self::write), or constructs them
+///    in place via [`writer`](Self::writer).
+/// 4. Returns [`EncodeStatus::Received`].
+///
+/// When the callback returns, the FFI shim points `encoder_packet.data` at
+/// the buffer's bytes. OBS reads them before the next encode call, after
+/// which the buffer can be reused.
 pub struct EncoderPacket<'a> {
     pub(crate) raw: &'a mut encoder_packet,
     pub(crate) buffer: &'a mut Vec<u8>,
 }
 
 impl EncoderPacket<'_> {
-    /// Truncate the per-encoder payload buffer. Cheap; capacity is retained
-    /// across calls.
+    /// Clears the payload buffer without releasing its capacity.
+    ///
+    /// Call this at the top of every encode callback before writing the
+    /// new payload.
     pub fn reset(&mut self) {
         self.buffer.clear();
     }
 
-    /// Append bytes to the payload.
+    /// Appends bytes to the payload.
     pub fn write(&mut self, bytes: &[u8]) {
         self.buffer.extend_from_slice(bytes);
     }
 
-    /// Direct mutable access to the payload buffer. Useful when the codec
-    /// hands you a buffer to extend in-place (e.g. NAL splicing for SEI).
+    /// Returns mutable access to the payload buffer.
+    ///
+    /// Useful when the underlying codec hands back a buffer that should be
+    /// extended in place — for example, when splicing NAL units for SEI
+    /// insertion.
     pub fn writer(&mut self) -> &mut Vec<u8> {
         self.buffer
     }
 
+    /// Sets the presentation timestamp, in the encoder's timebase.
     pub fn set_pts(&mut self, pts: i64) {
         self.raw.pts = pts;
     }
 
+    /// Sets the decode timestamp, in the encoder's timebase.
     pub fn set_dts(&mut self, dts: i64) {
         self.raw.dts = dts;
     }
 
+    /// Marks this packet as a keyframe.
     pub fn set_keyframe(&mut self, keyframe: bool) {
         self.raw.keyframe = keyframe;
     }
 
+    /// Sets the muxing priority of this packet.
     pub fn set_priority(&mut self, priority: i32) {
         self.raw.priority = priority;
     }
 
+    /// Sets the priority used to decide which packets to drop under
+    /// congestion.
     pub fn set_drop_priority(&mut self, drop_priority: i32) {
         self.raw.drop_priority = drop_priority;
     }
 
+    /// Sets the track index this packet belongs to (multi-track outputs).
     pub fn set_track_idx(&mut self, idx: usize) {
         self.raw.track_idx = idx;
     }
 
+    /// Sets the rational timebase for the timestamps on this packet.
     pub fn set_timebase(&mut self, num: i32, den: i32) {
         self.raw.timebase_num = num;
         self.raw.timebase_den = den;
     }
 
+    /// Marks this packet as audio or video.
     pub fn set_packet_type(&mut self, ty: EncoderType) {
         self.raw.type_ = ty.as_raw();
     }
 }
 
-/// Read-only view over an `encoder_packet` an output is receiving (e.g.
-/// from a downstream encoder). The underlying buffer is owned by the
-/// encoder; the view only lives for the duration of the callback.
+/// A read-only view of a previously-encoded packet, as delivered to an
+/// output.
+///
+/// Outputs that consume encoded packets receive an `EncodedPacketView`
+/// referring to a buffer owned by the upstream encoder. The view is only
+/// valid for the duration of the receiving callback; copy any bytes you
+/// need to retain.
 pub struct EncodedPacketView<'a> {
     raw: &'a encoder_packet,
 }
@@ -163,41 +208,50 @@ impl<'a> EncodedPacketView<'a> {
         Self { raw }
     }
 
-    /// Encoded payload bytes.
+    /// Returns the encoded payload bytes.
     pub fn data(&self) -> &'a [u8] {
         // SAFETY: raw.data + raw.size is the encoder's owned buffer; valid for
         // the lifetime of this view.
         unsafe { std::slice::from_raw_parts(self.raw.data, self.raw.size) }
     }
 
+    /// Returns the presentation timestamp.
     pub fn pts(&self) -> i64 {
         self.raw.pts
     }
 
+    /// Returns the decode timestamp.
     pub fn dts(&self) -> i64 {
         self.raw.dts
     }
 
+    /// Returns whether this packet is marked as a keyframe.
     pub fn keyframe(&self) -> bool {
         self.raw.keyframe
     }
 
+    /// Returns the muxing priority.
     pub fn priority(&self) -> i32 {
         self.raw.priority
     }
 
+    /// Returns the priority used by congestion-based packet drop.
     pub fn drop_priority(&self) -> i32 {
         self.raw.drop_priority
     }
 
+    /// Returns the track index this packet belongs to.
     pub fn track_idx(&self) -> usize {
         self.raw.track_idx
     }
 
+    /// Returns the timebase as a `(numerator, denominator)` pair.
     pub fn timebase(&self) -> (i32, i32) {
         (self.raw.timebase_num, self.raw.timebase_den)
     }
 
+    /// Returns whether this packet is audio or video, or `None` if the
+    /// underlying value does not correspond to a known encoder type.
     pub fn packet_type(&self) -> Option<EncoderType> {
         match self.raw.type_ {
             obs_rs_sys::obs_encoder_type_OBS_ENCODER_VIDEO => Some(EncoderType::Video),

@@ -22,19 +22,29 @@ use obs_rs_sys::{
 
 use crate::{string::cstring_from_ptr, wrapper::PtrWrapper};
 
+/// The runtime type tag of a value stored in a [`DataObj`].
+///
+/// Mirrors the `obs_data_type` / `obs_data_number_type` enums, collapsing
+/// the integer and floating-point number sub-types into distinct
+/// [`DataType::Int`] and [`DataType::Double`] variants.
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum DataType {
+    /// A C-string value.
     String,
+    /// An integer number.
     Int,
+    /// A floating-point number.
     Double,
+    /// A boolean.
     Boolean,
-    /// Map container
+    /// A nested key-value object — see [`DataObj`].
     Object,
-    /// Array container
+    /// An ordered list of objects — see [`DataArray`].
     Array,
 }
 
 impl DataType {
+    /// Computes a `DataType` from a libobs type pair.
     pub fn new(typ: obs_data_type, numtyp: obs_data_number_type) -> Self {
         match typ {
             obs_data_type_OBS_DATA_STRING => Self::String,
@@ -57,16 +67,29 @@ impl DataType {
     }
 }
 
+/// A type that can be read from and written to a [`DataObj`].
+///
+/// Implemented by the integer, floating-point, boolean, string,
+/// [`DataObj`], and [`DataArray`] types so they can flow through
+/// [`DataObj::get`] and [`DataObj::set_default`].
 pub trait FromDataItem: Sized {
+    /// Returns the [`DataType`] this implementation reads and writes.
     fn typ() -> DataType;
+
+    /// Reads a value of this type from a libobs data item.
+    ///
     /// # Safety
     ///
-    /// Pointer must be valid.
+    /// `item` must be a valid `obs_data_item_t*` whose stored type
+    /// matches [`Self::typ`].
     unsafe fn from_item_unchecked(item: *mut obs_data_item_t) -> Option<Self>;
 
+    /// Writes a default value for `name` into the given data object.
+    ///
     /// # Safety
     ///
-    /// Pointer must be valid.
+    /// `obj` must be a valid `obs_data_t*` and `name` must outlive the
+    /// call.
     unsafe fn set_default_unchecked(obj: *mut obs_data_t, name: &CStr, val: Self);
 }
 
@@ -184,7 +207,17 @@ impl FromDataItem for DataArray<'_> {
     }
 }
 
-/// A smart pointer to `obs_data_t`
+/// A reference-counted handle to an `obs_data_t` settings object.
+///
+/// `DataObj` is the JSON-shaped key/value store OBS uses for plugin
+/// settings. Values are accessed by name through [`DataObj::get`] and
+/// [`DataObj::set_default`], which dispatch on the value's runtime type
+/// via the [`FromDataItem`] trait. The contents can also be serialized
+/// to and from JSON with [`DataObj::from_json`] and [`DataObj::get_json`].
+///
+/// The `'parent` lifetime constrains a borrowed view of a parent object
+/// to its parent's lifetime; objects produced by [`DataObj::new`] or
+/// [`DataObj::from_json`] are unconstrained (`'static`).
 pub struct DataObj<'parent> {
     raw: *mut obs_data_t,
     _parent: PhantomData<&'parent DataObj<'parent>>,
@@ -213,7 +246,7 @@ impl Default for DataObj<'_> {
 }
 
 impl DataObj<'_> {
-    /// Creates a empty data object
+    /// Creates a new, empty data object.
     pub fn new() -> Self {
         unsafe {
             let raw = obs_data_create();
@@ -221,7 +254,9 @@ impl DataObj<'_> {
         }
     }
 
-    /// Loads data into a object from a JSON string.
+    /// Parses a data object from a JSON string.
+    ///
+    /// Returns `None` if the JSON is malformed.
     pub fn from_json(json_str: impl AsRef<CStr>) -> Option<Self> {
         unsafe {
             let raw = obs_data_create_from_json(json_str.as_ref().as_ptr());
@@ -229,9 +264,11 @@ impl DataObj<'_> {
         }
     }
 
-    /// Loads data into a object from a JSON file.
-    /// * `backup_ext`: optional backup file path in case the original file is
-    ///   bad.
+    /// Loads a data object from a JSON file.
+    ///
+    /// If `backup_ext` is provided, OBS uses it as the suffix for a
+    /// fallback file to consult when `json_file` is corrupted (matching
+    /// the semantics of `obs_data_create_from_json_file_safe`).
     pub fn from_json_file(json_file: impl AsRef<CStr>, backup_ext: Option<&CStr>) -> Option<Self> {
         unsafe {
             let raw = if let Some(backup_ext) = backup_ext {
@@ -246,7 +283,11 @@ impl DataObj<'_> {
         }
     }
 
-    /// Fetches a property from this object. Numbers are implicitly casted.
+    /// Looks up `name` and decodes its value as `T`.
+    ///
+    /// Returns `None` if `name` is missing or its stored type does not
+    /// match `T::typ()`. Integer types are implicitly narrowed or widened
+    /// as the type system permits.
     pub fn get<T: FromDataItem>(&self, name: impl AsRef<CStr>) -> Option<T> {
         let name = name.as_ref();
         let mut item_ptr = unsafe { obs_data_item_byname(self.as_ptr() as *mut _, name.as_ptr()) };
@@ -268,16 +309,26 @@ impl DataObj<'_> {
         }
     }
 
-    /// Sets a default value for the key.
+    /// Sets the default value of `name`.
     ///
-    /// Notes
-    /// -----
-    /// Setting a default value for a [`DataArray`] is not supported and will panic.
+    /// The default is used when OBS reads `name` and no explicit value
+    /// has been stored. Defaults survive across calls to [`clear`]
+    /// (they live on a separate underlying `obs_data_t`).
+    ///
+    /// # Panics
+    ///
+    /// Defaulting a [`DataArray`] is not supported by libobs and will
+    /// panic.
+    ///
+    /// [`clear`]: Self::clear
     pub fn set_default<T: FromDataItem>(&mut self, name: impl AsRef<CStr>, value: impl Into<T>) {
         unsafe { T::set_default_unchecked(self.as_ptr_mut(), name.as_ref(), value.into()) }
     }
 
-    /// Creates a JSON representation of this object.
+    /// Serializes this object to a JSON string.
+    ///
+    /// Returns `None` if libobs declines to produce a JSON
+    /// representation (typically only on out-of-memory).
     pub fn get_json(&self) -> Option<String> {
         unsafe {
             let ptr = obs_data_get_json(self.raw);
@@ -285,13 +336,14 @@ impl DataObj<'_> {
         }
     }
 
-    /// Clears all values.
+    /// Removes every key-value pair from this object.
     pub fn clear(&mut self) {
         unsafe {
             obs_data_clear(self.raw);
         }
     }
 
+    /// Removes `name` from this object, if present.
     pub fn remove(&mut self, name: impl AsRef<CStr>) {
         unsafe {
             obs_data_erase(self.raw, name.as_ref().as_ptr());
@@ -299,6 +351,11 @@ impl DataObj<'_> {
     }
 }
 
+/// A reference-counted handle to an `obs_data_array_t`.
+///
+/// `DataArray` is the ordered-collection counterpart to [`DataObj`];
+/// elements are themselves [`DataObj`] values, looked up by index via
+/// [`DataArray::get`].
 pub struct DataArray<'parent> {
     raw: *mut obs_data_array_t,
     _parent: PhantomData<&'parent DataArray<'parent>>,
@@ -320,14 +377,17 @@ impl crate::wrapper::PtrWrapperInternal for DataArray<'_> {
 impl_ptr_wrapper!(DataArray<'_>, obs_data_array_t, @identity, obs_data_array_release);
 
 impl DataArray<'_> {
+    /// Returns the number of elements in the array.
     pub fn len(&self) -> usize {
         unsafe { obs_data_array_count(self.raw) }
     }
 
+    /// Returns `true` if the array has no elements.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    /// Returns the element at `index`, or `None` if out of bounds.
     pub fn get(&self, index: usize) -> Option<DataObj<'_>> {
         // https://github.com/obsproject/obs-studio/blob/01610d8c06edb08d0cc3155cb91b3e52e9a6473e/libobs/obs-data.c#L1395
         // os_atomic_inc_long(&data->ref);

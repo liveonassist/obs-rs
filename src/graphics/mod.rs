@@ -87,11 +87,22 @@ native_enum!(ShaderParamType, gs_shader_param_type {
     Texture => GS_SHADER_PARAM_TEXTURE,
 });
 
+/// A compiled graphics effect (`gs_effect_t`).
+///
+/// Effects encapsulate the shaders and parameters used to render OBS
+/// sources and filters. Construct with
+/// [`GraphicsEffect::from_effect_string`]; access individual parameters
+/// via [`GraphicsEffect::get_effect_param_by_name`].
 pub struct GraphicsEffect {
     raw: *mut gs_effect_t,
 }
 
 impl GraphicsEffect {
+    /// Compiles an effect from source code.
+    ///
+    /// `value` is the effect's source text; `name` is the identifier
+    /// used in compiler diagnostics. Returns `None` if compilation
+    /// fails.
     pub fn from_effect_string(value: &CStr, name: &CStr) -> Option<Self> {
         let raw = GraphicsGuard::with_enter(|| unsafe {
             gs_effect_create(value.as_ptr(), name.as_ptr(), std::ptr::null_mut())
@@ -103,6 +114,11 @@ impl GraphicsEffect {
         }
     }
 
+    /// Looks up a parameter by name and converts it to the target
+    /// strongly-typed wrapper.
+    ///
+    /// Returns `None` if the parameter does not exist or its declared
+    /// shader type does not match `T`.
     pub fn get_effect_param_by_name<T: TryFrom<GraphicsEffectParam>>(
         &mut self,
         name: &CStr,
@@ -117,8 +133,13 @@ impl GraphicsEffect {
         }
     }
 
+    /// Returns the underlying `gs_effect_t*`.
+    ///
     /// # Safety
-    /// Returns a mutable pointer to an effect which if modified could cause UB.
+    ///
+    /// Mutating effect state behind libobs's back can leave the graphics
+    /// pipeline in an inconsistent state. The pointer must not be released
+    /// by the caller.
     pub unsafe fn as_ptr(&self) -> *mut gs_effect_t {
         self.raw
     }
@@ -132,10 +153,20 @@ impl Drop for GraphicsEffect {
     }
 }
 
+/// Errors returned when narrowing a [`GraphicsEffectParam`] to a
+/// strongly-typed wrapper such as [`GraphicsEffectVec2Param`].
 pub enum GraphicsEffectParamConversionError {
+    /// The parameter exists but its declared shader type does not match
+    /// the wrapper being requested.
     InvalidType,
 }
 
+/// A handle to a single parameter on a [`GraphicsEffect`].
+///
+/// `GraphicsEffectParam` carries the parameter's name and declared
+/// shader type. Convert it to a typed wrapper (e.g.
+/// [`GraphicsEffectVec2Param`], [`GraphicsEffectTextureParam`]) before
+/// reading or writing values.
 pub struct GraphicsEffectParam {
     raw: *mut gs_eparam_t,
     name: String,
@@ -143,9 +174,13 @@ pub struct GraphicsEffectParam {
 }
 
 impl GraphicsEffectParam {
+    /// Wraps a raw `gs_eparam_t*`.
+    ///
     /// # Safety
-    /// Creates a GraphicsEffectParam from a mutable reference. This data could
-    /// be modified somewhere else so this is UB.
+    ///
+    /// `raw` must point at a parameter that lives at least as long as
+    /// the resulting `GraphicsEffectParam`, and must not be mutated
+    /// concurrently from outside the wrapper.
     pub unsafe fn from_raw(raw: *mut gs_eparam_t) -> Self {
         let mut info = gs_effect_param_info::default();
         gs_effect_get_param_info(raw, &mut info);
@@ -162,6 +197,7 @@ impl GraphicsEffectParam {
         }
     }
 
+    /// Returns the parameter's declared name.
     pub fn get_name(&self) -> &str {
         &self.name
     }
@@ -241,11 +277,17 @@ native_enum!(GraphicsSampleFilter, gs_sample_filter {
     MinMagLinearMipPoint => GS_FILTER_MIN_MAG_LINEAR_MIP_POINT,
 });
 
+/// Builder for a [`GraphicsSamplerState`].
+///
+/// Configures wrap modes for each axis and the texture filter. Convert
+/// to a usable sampler with `Into::into`.
 pub struct GraphicsSamplerInfo {
     info: gs_sampler_info,
 }
 
 impl GraphicsSamplerInfo {
+    /// Creates a new sampler description with clamp wrapping on every
+    /// axis and point filtering.
     pub fn new() -> Self {
         Self {
             info: gs_sampler_info {
@@ -259,21 +301,25 @@ impl GraphicsSamplerInfo {
         }
     }
 
+    /// Sets the wrap mode for the U axis.
     pub fn with_address_u(mut self, mode: GraphicsAddressMode) -> Self {
         self.info.address_u = mode.as_raw();
         self
     }
 
+    /// Sets the wrap mode for the V axis.
     pub fn with_address_v(mut self, mode: GraphicsAddressMode) -> Self {
         self.info.address_v = mode.as_raw();
         self
     }
 
+    /// Sets the wrap mode for the W axis.
     pub fn with_address_w(mut self, mode: GraphicsAddressMode) -> Self {
         self.info.address_w = mode.as_raw();
         self
     }
 
+    /// Sets the texture filter mode.
     pub fn with_filter(mut self, mode: GraphicsSampleFilter) -> Self {
         self.info.filter = mode.as_raw();
         self
@@ -286,6 +332,10 @@ impl Default for GraphicsSamplerInfo {
     }
 }
 
+/// A compiled sampler state (`gs_samplerstate_t`).
+///
+/// Construct from a [`GraphicsSamplerInfo`] via `Into::into`. The
+/// destructor releases the underlying object.
 pub struct GraphicsSamplerState {
     raw: *mut gs_samplerstate_t,
 }
@@ -305,12 +355,23 @@ impl Drop for GraphicsSamplerState {
     }
 }
 
+/// A capability token signalling that the calling thread is currently
+/// inside an active effect-rendering context.
+///
+/// Methods that require an active graphics context borrow a
+/// `GraphicsEffectContext` rather than asserting it implicitly. The
+/// crate constructs it at the appropriate boundary; user code never
+/// produces one directly.
 pub struct GraphicsEffectContext {}
 
 impl GraphicsEffectContext {
+    /// Constructs a fresh `GraphicsEffectContext`.
+    ///
     /// # Safety
-    /// GraphicsEffectContext has methods that should only be used in certain situations.
-    /// Constructing it at the wrong time could cause UB.
+    ///
+    /// Only valid while the calling thread is inside an active OBS
+    /// effect-rendering context (e.g. between
+    /// `obs_source_process_filter_begin` and `_end`).
     pub(crate) unsafe fn new() -> Self {
         Self {}
     }
@@ -512,12 +573,21 @@ vector_impls! {
     Vec4, vec4 => x y z w,
 }
 
-/// Wrapper around [`gs_texture_t`](https://obsproject.com/docs/reference-libobs-graphics-graphics.html#c.gs_texture_t)
+/// A GPU-resident texture (`gs_texture_t`).
+///
+/// `GraphicsTexture` owns a libobs-managed texture; the destructor
+/// releases the underlying object.
+///
+/// See the [OBS reference][docs] for the underlying C API.
+///
+/// [docs]: https://obsproject.com/docs/reference-libobs-graphics-graphics.html#c.gs_texture_t
 pub struct GraphicsTexture {
     raw: *mut gs_texture_t,
 }
 
 impl GraphicsTexture {
+    /// Allocates a new dynamic texture with the given dimensions and
+    /// pixel format.
     pub fn new(width: u32, height: u32, format: GraphicsColorFormat) -> Self {
         let raw = GraphicsGuard::with_enter(|| unsafe {
             gs_texture_create(width, height, format.as_raw(), 1, null_mut(), GS_DYNAMIC)
@@ -525,33 +595,48 @@ impl GraphicsTexture {
         Self { raw }
     }
 
+    /// Returns the texture height, in pixels.
     #[inline]
     pub fn height(&self) -> u32 {
         GraphicsGuard::with_enter(|| unsafe { gs_texture_get_height(self.raw) })
     }
 
+    /// Returns the texture width, in pixels.
     #[inline]
     pub fn width(&self) -> u32 {
         GraphicsGuard::with_enter(|| unsafe { gs_texture_get_width(self.raw) })
     }
 
+    /// Uploads CPU-side pixel data into the texture.
+    ///
+    /// `linesize` is the source stride in bytes. When `invert` is true,
+    /// the source rows are uploaded bottom-up.
     pub fn set_image(&mut self, data: &[u8], linesize: u32, invert: bool) {
         GraphicsGuard::with_enter(|| unsafe {
             gs_texture_set_image(self.raw, data.as_ptr(), linesize, invert);
         });
     }
 
+    /// Draws the texture as an OBS source quad at `(x, y)` sized
+    /// `(cx, cy)`. When `flip` is true, the result is flipped
+    /// vertically.
     pub fn draw(&self, x: c_int, y: c_int, cx: u32, cy: u32, flip: bool) {
         unsafe {
             obs_source_draw(self.raw, x, y, cx, cy, flip);
         }
     }
 
+    /// Maps the texture into CPU-addressable memory for read/write
+    /// access.
+    ///
+    /// Returns an RAII [`MappedTexture`] guard; dropping it unmaps the
+    /// texture.
     #[inline]
     pub fn map(&mut self) -> Result<MappedTexture<'_>> {
         MappedTexture::new(self)
     }
 
+    /// Returns the underlying `gs_texture_t*`.
     pub fn as_ptr(&self) -> *mut gs_texture_t {
         self.raw
     }
@@ -565,7 +650,12 @@ impl Drop for GraphicsTexture {
     }
 }
 
-/// Represents a mapped texture blob from [`GraphicsTexture`].
+/// CPU-side view into a [`GraphicsTexture`] obtained via
+/// [`GraphicsTexture::map`].
+///
+/// Implements [`Deref`](std::ops::Deref) and [`DerefMut`](std::ops::DerefMut)
+/// to a byte slice covering the mapped pixels. Dropping the guard
+/// unmaps the texture.
 pub struct MappedTexture<'tex> {
     tex: &'tex mut GraphicsTexture,
     ptr: *mut u8,
@@ -586,21 +676,26 @@ impl<'tex> MappedTexture<'tex> {
         Ok(Self { tex, ptr, len })
     }
 
+    /// Returns a raw pointer to the start of the mapped pixel data.
     #[inline]
     pub fn as_ptr(&self) -> *const u8 {
         self.ptr
     }
 
+    /// Returns a raw mutable pointer to the start of the mapped pixel
+    /// data.
     #[inline]
     pub fn as_mut_ptr(&mut self) -> *mut u8 {
         self.ptr
     }
 
+    /// Returns the texture width, in pixels.
     #[inline]
     pub fn width(&self) -> u32 {
         self.tex.width()
     }
 
+    /// Returns the texture height, in pixels.
     #[inline]
     pub fn height(&self) -> u32 {
         self.tex.height()

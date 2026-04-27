@@ -4,15 +4,20 @@
 // prefer explicit `unsafe { … }` blocks.
 #![allow(unsafe_op_in_unsafe_fn)]
 
-//! # Rust OBS Wrapper
+//! # `obs-rs`
 //!
-//! A safe wrapper around the OBS API, useful for creating OBS sources, filters
-//! and effects.
+//! Safe Rust bindings for authoring [OBS Studio] plugins. The crate
+//! wraps libobs's `obs_*_info` registration tables in idiomatic Rust APIs
+//! so plugins can register sources, filters, transitions, encoders, and
+//! outputs without writing any unsafe FFI plumbing themselves.
 //!
-//! ## Usage
+//! [OBS Studio]: https://obsproject.com
 //!
-//! In your `Cargo.toml` file add the following section, substituting
-//! `<module-name>` for the name of the module:
+//! ## Cargo configuration
+//!
+//! Plugins are dynamic libraries loaded by OBS at runtime. Add `obs-rs` as
+//! a dependency and configure the crate as a `cdylib`, substituting
+//! `<module-name>` with the name of your plugin:
 //!
 //! ```toml
 //! [dependencies]
@@ -23,11 +28,21 @@
 //! crate-type = ["cdylib"]
 //! ```
 //!
-//! The process for creating a plugin is:
-//! 1. Create a struct that implements Module
-//! 1. Create a struct that will store the plugin state
-//! 1. Implement the required traits for the module
-//! 1. Enable the traits which have been enabled in the module `load` method
+//! ## Authoring a plugin
+//!
+//! 1. Define a type for the plugin's per-module state and implement
+//!    [`module::Module`] on it.
+//! 2. Define one or more types holding the per-instance state of each
+//!    source, encoder, or output your plugin provides, and implement the
+//!    matching `*able` trait
+//!    ([`source::Sourceable`], [`encoder::Encodable`], or
+//!    [`output::Outputable`]).
+//! 3. Implement the optional callback traits you need (display name,
+//!    update, render, encode, …).
+//! 4. From [`Module::load`](crate::module::Module::load), use the supplied
+//!    [`LoadContext`](crate::module::LoadContext) to build the
+//!    registrations and hand them to OBS.
+//! 5. Wire everything up at the crate root with [`obs_register_module!`].
 //!
 //! ~~~
 //! use std::ffi::CStr;
@@ -118,53 +133,65 @@
 //! }
 //! ~~~
 //!
-//! ### Installing
+//! ## Installing
 //!
-//! 1. Run `cargo build --release`
-//! 2. Copy `/target/release/<module-name>.so` to your OBS plugins folder
-//!    (`/usr/lib/obs-plugins/`)
-//! 3. The plugin should be available for use from inside OBS
+//! 1. Build with `cargo build --release`.
+//! 2. Copy the resulting shared library into OBS's plugins directory
+//!    (e.g. `/usr/lib/obs-plugins/` on Linux,
+//!    `~/Library/Application Support/obs-studio/plugins/<name>/bin/` on
+//!    macOS, or `%ProgramFiles%\obs-studio\obs-plugins\64bit\` on
+//!    Windows).
+//! 3. Restart OBS. The plugin will appear in the relevant pickers.
 
-/// Raw bindings of OBS C API
+/// Raw, unsafe bindings to the OBS C API. Re-exported so plugins can drop
+/// down to FFI when needed.
 pub use obs_rs_sys;
 
-/// FFI pointer wrapper
+/// Helpers for wrapping reference-counted OBS pointer types.
 #[macro_use]
 pub mod wrapper;
-/// `obs_data_t` handling
+/// Bindings for `obs_data_t` — OBS's JSON-shaped settings store.
 pub mod data;
-/// Tools for creating encoders
+/// Bindings for authoring custom OBS encoders.
 pub mod encoder;
-/// OBS Studio frontend API — UI-side controls for streaming, recording,
-/// scenes, transitions, profiles, save/load callbacks, etc.
+/// Bindings to OBS Studio's frontend API.
 ///
-/// Available only when running inside OBS Studio (the `obs-frontend-api`
-/// shared library is loaded by the application, not by `libobs`).
+/// The frontend API exposes the UI-side controls of OBS Studio:
+/// streaming, recording, scenes, transitions, profiles, save/load
+/// callbacks, and so on. It is only available when the plugin runs
+/// inside the OBS Studio application; it is not part of `libobs` and is
+/// gated behind the `frontend-api` feature.
 #[cfg(feature = "frontend-api")]
 pub mod frontend;
-/// Tools required for manipulating graphics in OBS
+/// Graphics and rendering primitives (effects, textures, samplers).
 pub mod graphics;
 mod hotkey;
-/// Logger for logging to OBS console
+/// Bridge between the [`log`] crate and the OBS logging subsystem.
 pub mod log;
-/// Tools for access media like video and audio
+/// Audio and video format definitions, plus borrowed views over OBS
+/// audio/video buffers.
 pub mod media;
-/// Tools for creating modules
+/// Module entrypoint, registration, and lifecycle hooks.
 pub mod module;
-/// Tools for creating outputs
+/// Bindings for authoring custom OBS outputs.
 pub mod output;
-/// Tools for creating properties
+/// Builders for the `obs_properties_t` panels OBS renders in plugin
+/// settings dialogs.
 pub mod properties;
-/// Error handling
+/// Crate-wide [`Error`] and [`Result`] types.
 pub mod result;
-/// Tools for creating sources
+/// Bindings for authoring custom OBS sources.
 pub mod source;
 /// String helpers for interop with OBS C strings.
 pub mod string;
 
 mod native_enum;
 
-/// Re-exports of a bunch of popular tools
+/// Re-exports of the types most plugins reach for.
+///
+/// Glob-importing `obs_rs::prelude::*` brings the [`Module`](module::Module)
+/// trait, the source-side context types, [`DataObj`](data::DataObj) and
+/// friends, and the C-string helpers into scope.
 pub mod prelude {
     pub use crate::data::{DataArray, DataObj, FromDataItem};
     pub use crate::module::*;

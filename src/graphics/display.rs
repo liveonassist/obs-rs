@@ -6,11 +6,21 @@ use obs_rs_sys::{
 
 use super::GraphicsColorFormat;
 
+/// An sRGB color with 8-bit per-channel components.
+///
+/// Built-in constants ([`Color::BLACK`], [`Color::WHITE`], [`Color::RED`],
+/// [`Color::GREEN`], [`Color::BLUE`]) cover the common cases. Conversion
+/// to and from linear-space sRGB is provided for callers that need to
+/// blend colors in the OBS render pipeline's working space.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Color {
+    /// Red channel.
     pub r: u8,
+    /// Green channel.
     pub g: u8,
+    /// Blue channel.
     pub b: u8,
+    /// Alpha channel.
     pub a: u8,
 }
 
@@ -35,10 +45,18 @@ impl Color {
     pub const GREEN: Color = Color::new(0, 255, 0, 255);
     pub const BLUE: Color = Color::new(0, 0, 255, 255);
 
+    /// Constructs a color from raw 8-bit per-channel components.
     pub const fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
         Color { r, g, b, a }
     }
 
+    /// Encodes the color as a packed 32-bit value in the requested
+    /// pixel format.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `format` is anything other than
+    /// [`GraphicsColorFormat::RGBA`] or [`GraphicsColorFormat::BGRA`].
     pub fn as_format(self, format: GraphicsColorFormat) -> u32 {
         match format {
             GraphicsColorFormat::RGBA => self.as_rgba(),
@@ -47,15 +65,19 @@ impl Color {
         }
     }
 
+    /// Encodes the color as a packed RGBA `u32`.
     pub fn as_rgba(self) -> u32 {
         u32::from_ne_bytes([self.r, self.g, self.b, self.a])
     }
 
+    /// Encodes the color as a packed BGRA `u32`.
     pub fn as_bgra(self) -> u32 {
         u32::from_ne_bytes([self.b, self.g, self.r, self.a])
     }
 
-    /// gs_float3_srgb_nonlinear_to_linear
+    /// Converts the color from sRGB nonlinear to sRGB linear space.
+    ///
+    /// Mirrors libobs's `gs_float3_srgb_nonlinear_to_linear`.
     pub fn srgb_nonlinear_to_linear(self) -> Self {
         let r = srgb_nonlinear_to_linear(self.r as f32 / 255.0);
         let g = srgb_nonlinear_to_linear(self.g as f32 / 255.0);
@@ -68,6 +90,7 @@ impl Color {
         }
     }
 
+    /// Converts the color from sRGB linear to sRGB nonlinear space.
     pub fn srgb_linear_to_nonlinear(self) -> Self {
         let r = srgb_linear_to_nonlinear(self.r as f32 / 255.0);
         let g = srgb_linear_to_nonlinear(self.g as f32 / 255.0);
@@ -81,8 +104,11 @@ impl Color {
     }
 }
 
-/// A reference to a display, inner pointer is not managed by reference count.
-/// So no `Clone` is implemented. you might want to use `Arc<DisplayRef>` if you need to clone it.
+/// A handle to an OBS display (`obs_display_t`).
+///
+/// `DisplayRef` owns the underlying display and destroys it on drop.
+/// The handle is not reference-counted, so [`Clone`] is not implemented;
+/// wrap in an [`Arc`](std::sync::Arc) if shared ownership is required.
 pub struct DisplayRef {
     inner: *mut obs_display_t,
 }
@@ -90,14 +116,17 @@ pub struct DisplayRef {
 impl_ptr_wrapper!(@ptr: inner, DisplayRef, obs_display_t, @identity, obs_display_destroy);
 
 impl DisplayRef {
+    /// Returns whether the display is currently enabled (rendering).
     pub fn enabled(&self) -> bool {
         unsafe { obs_display_enabled(self.inner) }
     }
 
+    /// Enables or disables the display.
     pub fn set_enabled(&self, enabled: bool) {
         unsafe { obs_display_set_enabled(self.inner, enabled) }
     }
 
+    /// Returns the display's `(width, height)` in pixels.
     pub fn size(&self) -> (u32, u32) {
         let mut cx = 0;
         let mut cy = 0;
@@ -105,14 +134,21 @@ impl DisplayRef {
         (cx, cy)
     }
 
+    /// Resizes the display.
     pub fn set_size(&self, cx: u32, cy: u32) {
         unsafe { obs_display_resize(self.inner, cx, cy) }
     }
 
+    /// Sets the display's clear color.
     pub fn set_background_color(&self, color: Color) {
         unsafe { obs_display_set_background_color(self.inner, color.as_rgba()) }
     }
 
+    /// Registers a draw callback on the display.
+    ///
+    /// Returns a [`DrawCallbackId`] that removes the callback on drop.
+    /// Use [`DrawCallbackId::forever`] to leak the registration if the
+    /// callback should fire for the rest of the display's lifetime.
     pub fn add_draw_callback<S: DrawCallback>(&self, callback: S) -> DrawCallbackId<'_, S> {
         let data = Box::into_raw(Box::new(callback));
         // force the pointer to be a function pointer, since it is not garantueed to be the same pointer
@@ -126,11 +162,17 @@ impl DisplayRef {
         DrawCallbackId::new(data, callback as *const _, self)
     }
 
+    /// Removes a previously-registered draw callback and returns the
+    /// owned callback value.
     pub fn remove_draw_callback<S: DrawCallback>(&self, data: DrawCallbackId<S>) -> S {
         data.take(self)
     }
 }
 
+/// A [`DrawCallback`] that renders the OBS main composition texture.
+///
+/// Useful as a drop-in callback when the only thing the display should
+/// draw is the program output.
 pub struct RenderMainTexture;
 
 impl DrawCallback for RenderMainTexture {
@@ -139,12 +181,22 @@ impl DrawCallback for RenderMainTexture {
     }
 }
 
+/// A type that can be invoked as a [`DisplayRef`] draw callback.
 pub trait DrawCallback {
+    /// Renders into the active display.
+    ///
+    /// `cx` and `cy` are the display's current width and height in
+    /// pixels.
     fn draw(&self, cx: u32, cy: u32);
 }
 
+/// FFI thunk that adapts a [`DrawCallback`] into the
+/// `obs_display_add_draw_callback` calling convention.
+///
 /// # Safety
-/// This function is called by OBS, and it is guaranteed that the pointer is valid.
+///
+/// Called only by OBS with a `data` pointer obtained from
+/// [`DrawCallbackId::new`]; user code should not invoke it directly.
 pub unsafe extern "C" fn draw_callback<S: DrawCallback>(
     data: *mut std::ffi::c_void,
     cx: u32,
@@ -154,6 +206,11 @@ pub unsafe extern "C" fn draw_callback<S: DrawCallback>(
     callback.draw(cx, cy);
 }
 
+/// RAII handle returned from [`DisplayRef::add_draw_callback`].
+///
+/// Dropping the handle removes the callback from the display and frees
+/// the boxed callback value. Use [`DrawCallbackId::forever`] to keep
+/// the registration alive for the rest of the display's lifetime.
 pub struct DrawCallbackId<'a, S> {
     data: *mut S,
     callback: *const std::ffi::c_void,
@@ -162,6 +219,8 @@ pub struct DrawCallbackId<'a, S> {
 }
 
 impl<'a, S> DrawCallbackId<'a, S> {
+    /// Constructs a new handle binding `data` and `callback` to
+    /// `display`. Used internally by [`DisplayRef::add_draw_callback`].
     pub fn new(data: *mut S, callback: *const std::ffi::c_void, display: &'a DisplayRef) -> Self {
         DrawCallbackId {
             data,
@@ -171,6 +230,12 @@ impl<'a, S> DrawCallbackId<'a, S> {
         }
     }
 
+    /// Removes the callback and returns its owned value.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `display` is not the same display the callback was
+    /// registered on.
     pub fn take(self, display: &DisplayRef) -> S {
         assert_eq!(self.display, display.inner);
         let ptr = self.data;
@@ -188,9 +253,12 @@ impl<'a, S> DrawCallbackId<'a, S> {
         unsafe { *Box::from_raw(ptr) }
     }
 
-    /// Forget the callback and keep it alive forever.
-    /// As long as the underlying display is alive, the callback will be called.
-    /// If the display is destroyed, the callback will be also dropped.
+    /// Leaks the registration so that it survives until the display is
+    /// destroyed.
+    ///
+    /// The callback continues to run for the lifetime of the underlying
+    /// display; once the display is destroyed, libobs releases the
+    /// registration and the callback's Box is dropped.
     pub fn forever(self) {
         std::mem::forget(self);
     }

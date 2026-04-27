@@ -1,67 +1,110 @@
+//! Common machinery for wrapping reference-counted OBS pointer types.
+//!
+//! libobs hands out a number of `obs_*_t` handle types whose lifetime is
+//! managed by an associated pair of `*_get_ref` / `*_release` functions.
+//! [`PtrWrapper`](crate::wrapper::PtrWrapper) models that ownership in Rust: implementors track an
+//! owned reference and release it on `Drop`. The crate's pointer-wrapping
+//! types ([`SourceRef`](crate::source::SourceRef),
+//! [`OutputRef`](crate::output::OutputRef),
+//! [`EncoderRef`](crate::encoder::EncoderRef), and similar) are produced
+//! by the `impl_ptr_wrapper!` macro and all expose this trait.
+
 use std::mem::forget;
 
+/// Internal companion to [`PtrWrapper`] used by the `impl_ptr_wrapper!`
+/// macro to bridge between the trait and the concrete struct field.
+///
+/// Implementors are produced by the macro; user code should not call
+/// these methods directly.
 pub trait PtrWrapperInternal: PtrWrapper {
+    /// Constructs the wrapper from an already-owned pointer.
+    ///
     /// # Safety
     ///
-    /// This function should not be called directly, use `from_raw` and
-    /// `from_raw_unchecked` instead.
+    /// Use [`PtrWrapper::from_raw`] or
+    /// [`PtrWrapper::from_raw_unchecked`] instead — this method does not
+    /// validate ownership.
     unsafe fn new_internal(ptr: *mut Self::Pointer) -> Self;
-    /// # Safety
-    ///
-    /// This function should not be called directly, use `as_ptr`,
-    /// `as_ptr_mut` and `into_raw` instead.
-    unsafe fn get_internal(&self) -> *mut Self::Pointer;
-}
-
-pub trait PtrWrapper: Sized {
-    type Pointer;
-
-    /// # Safety
-    ///
-    /// This function called extern C api, and should not be called directly.
-    unsafe fn get_ref(ptr: *mut Self::Pointer) -> *mut Self::Pointer;
-
-    /// # Safety
-    ///
-    /// This function called extern C api, and should not be called directly.
-    unsafe fn release(ptr: *mut Self::Pointer);
-
-    /// Wraps the pointer into a **owned** wrapper.
-    #[allow(clippy::not_unsafe_ptr_arg_deref)]
-    fn from_raw(raw: *mut Self::Pointer) -> Option<Self> {
-        unsafe { Self::from_raw_unchecked(Self::get_ref(raw)) }
-    }
-
-    /// Wraps a **owned** pointer into wrapper.
-    ///
-    /// # Safety
-    ///
-    /// You have to make sure you owned the pointer
-    unsafe fn from_raw_unchecked(raw: *mut Self::Pointer) -> Option<Self>;
 
     /// Returns the inner pointer.
     ///
     /// # Safety
     ///
-    /// This function would return a pointer not managed, should only called
-    /// when interacting with extern C api.
+    /// Use [`PtrWrapper::as_ptr`], [`PtrWrapper::as_ptr_mut`], or
+    /// [`PtrWrapper::into_raw`] instead.
+    unsafe fn get_internal(&self) -> *mut Self::Pointer;
+}
+
+/// A safe wrapper around a reference-counted OBS pointer.
+///
+/// Implementors own a reference to a libobs handle and release it on
+/// `Drop`. Concrete implementations are normally produced by the
+/// `impl_ptr_wrapper!` macro.
+pub trait PtrWrapper: Sized {
+    /// The wrapped libobs handle type (e.g. `obs_source_t`).
+    type Pointer;
+
+    /// Increments the reference count on `ptr`.
+    ///
+    /// # Safety
+    ///
+    /// Calls into the underlying C API; intended for internal use by
+    /// [`from_raw`](Self::from_raw).
+    unsafe fn get_ref(ptr: *mut Self::Pointer) -> *mut Self::Pointer;
+
+    /// Decrements the reference count on `ptr`.
+    ///
+    /// # Safety
+    ///
+    /// Calls into the underlying C API; intended for internal use by
+    /// `Drop`.
+    unsafe fn release(ptr: *mut Self::Pointer);
+
+    /// Wraps `raw`, taking a fresh reference.
+    ///
+    /// Returns `None` if `raw` is null. The returned wrapper owns its
+    /// reference and will release it on drop.
+    #[allow(clippy::not_unsafe_ptr_arg_deref)]
+    fn from_raw(raw: *mut Self::Pointer) -> Option<Self> {
+        unsafe { Self::from_raw_unchecked(Self::get_ref(raw)) }
+    }
+
+    /// Wraps an already-owned pointer without taking an additional
+    /// reference.
+    ///
+    /// # Safety
+    ///
+    /// `raw` must be a pointer the caller already owns a reference to;
+    /// the returned wrapper assumes that reference and will release it
+    /// on drop.
+    unsafe fn from_raw_unchecked(raw: *mut Self::Pointer) -> Option<Self>;
+
+    /// Returns the inner pointer without transferring ownership.
+    ///
+    /// # Safety
+    ///
+    /// The returned pointer must only be used for the duration of the
+    /// borrow of `self`, and must not be released by the caller.
     unsafe fn as_ptr(&self) -> *const Self::Pointer;
 
-    /// Consumes the wrapper and transfers ownershop to the pointer
+    /// Consumes the wrapper and returns the inner pointer, transferring
+    /// ownership of the reference to the caller.
     ///
-    /// This does **NOT** drop the wrapper internally.
+    /// `Drop` does not run on the consumed wrapper. The caller becomes
+    /// responsible for eventually releasing the pointer.
     fn into_raw(self) -> *mut Self::Pointer {
         let raw = unsafe { self.as_ptr_mut() };
         forget(self);
         raw
     }
 
-    /// Returns the inner pointer (mutable version).
+    /// Returns the inner pointer as `*mut`, without transferring
+    /// ownership.
     ///
     /// # Safety
     ///
-    /// This function would return a pointer not managed, should only called
-    /// when interacting with extern C api.
+    /// Same constraints as [`as_ptr`](Self::as_ptr): the pointer must
+    /// not outlive the borrow and must not be released by the caller.
     unsafe fn as_ptr_mut(&self) -> *mut Self::Pointer {
         self.as_ptr() as *mut _
     }

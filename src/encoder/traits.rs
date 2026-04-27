@@ -9,46 +9,88 @@ use super::context::{
 };
 use super::{EncoderRef, EncoderType};
 
-/// Required trait for any encoder. Identifies the encoder, names the codec,
-/// and constructs the per-instance state.
+/// The mandatory trait every encoder must implement.
+///
+/// `Encodable` identifies the encoder, names the codec it produces, and
+/// constructs the per-instance state. Implementations are paired with the
+/// optional traits in this module by [`EncoderInfoBuilder`] at registration
+/// time.
+///
+/// [`EncoderInfoBuilder`]: super::EncoderInfoBuilder
 pub trait Encodable: Sized {
-    /// Unique encoder id (`"obs_x264"`, `"my_h264_sei"`, ...). Registered into
-    /// a global table.
+    /// Returns the globally-unique identifier for this encoder type, for
+    /// example `c"obs_x264"` or `c"my_h264_sei"`.
+    ///
+    /// OBS records this id in a process-global table; it must be stable
+    /// across plugin loads and unique among all registered encoders.
     fn get_id() -> &'static CStr;
 
-    /// Codec the encoder produces (`"h264"`, `"hevc"`, `"av1"`, `"aac"`,
-    /// `"opus"`).
+    /// Returns the codec name produced by this encoder, for example
+    /// `c"h264"`, `c"hevc"`, `c"av1"`, `c"aac"`, or `c"opus"`.
     fn get_codec() -> &'static CStr;
 
+    /// Returns whether this encoder produces audio or video packets.
     fn get_type() -> EncoderType;
 
+    /// Constructs a new encoder instance from the given settings.
+    ///
+    /// Called by OBS each time a new encoder of this type is created.
+    /// `encoder` is a reference to the freshly-allocated `obs_encoder_t`
+    /// the new instance is associated with.
     fn create(
         ctx: &mut CreatableEncoderContext<Self>,
         encoder: EncoderRef,
     ) -> Result<Self, CreateError>;
 }
 
+/// Provides a localized, user-visible display name for the encoder.
+///
+/// Enable with
+/// [`EncoderInfoBuilder::enable_get_name`](super::EncoderInfoBuilder::enable_get_name).
 pub trait GetNameEncoder {
+    /// Returns the display name shown in OBS UIs.
     fn get_name() -> &'static CStr;
 }
 
+/// Applies a new settings object to a running encoder.
+///
+/// Enable with
+/// [`EncoderInfoBuilder::enable_update`](super::EncoderInfoBuilder::enable_update).
 pub trait UpdateEncoder: Sized {
-    /// Apply a new settings object. Return `true` on success.
+    /// Applies updated settings. Returns `true` on success, `false` to
+    /// indicate the encoder could not adopt the new settings.
     fn update(&mut self, settings: &mut DataObj) -> bool;
 }
 
+/// Builds the user-facing [`Properties`] panel for the encoder.
+///
+/// Enable with
+/// [`EncoderInfoBuilder::enable_get_properties`](super::EncoderInfoBuilder::enable_get_properties).
 pub trait GetPropertiesEncoder: Sized {
+    /// Returns the property tree that OBS will render in the encoder's
+    /// settings UI.
     fn get_properties(&self) -> Properties;
 }
 
+/// Populates the default settings written into a freshly-created encoder.
+///
+/// Enable with
+/// [`EncoderInfoBuilder::enable_get_defaults`](super::EncoderInfoBuilder::enable_get_defaults).
 pub trait GetDefaultsEncoder {
+    /// Writes default values into `settings`.
     fn get_defaults(settings: &mut DataObj);
 }
 
-/// CPU-path encode callback. Implement this for software encoders. Mutually
-/// exclusive with [`EncodeTextureEncoder`] (a single encoder builder enables
-/// only one).
+/// CPU-path encode callback for software encoders.
+///
+/// Mutually exclusive with [`EncodeTextureEncoder`]: a single encoder can
+/// register only one encode path. Enable with
+/// [`EncoderInfoBuilder::enable_encode`](super::EncoderInfoBuilder::enable_encode).
 pub trait EncodeEncoder: Sized {
+    /// Consumes a frame of input and, when ready, produces a packet.
+    ///
+    /// Return [`EncodeStatus::Received`] to deliver a packet, or
+    /// [`EncodeStatus::NotReady`] if the encoder is still buffering.
     fn encode(
         &mut self,
         frame: &EncoderFrame<'_>,
@@ -57,10 +99,17 @@ pub trait EncodeEncoder: Sized {
 }
 
 /// GPU-path encode callback for encoders advertising
-/// `EncoderCap::PassTexture`. Receives a shared-texture handle (Windows) or a
-/// driver-specific texture id; the encoder is expected to consume it through
-/// its native API.
+/// [`EncoderCap::PassTexture`](super::EncoderCap::PassTexture).
+///
+/// The callback receives a shared-texture handle (on Windows) or a
+/// driver-specific texture identifier on other platforms; the encoder is
+/// expected to consume it through its native API. Enable with
+/// [`EncoderInfoBuilder::enable_encode_texture`](super::EncoderInfoBuilder::enable_encode_texture).
 pub trait EncodeTextureEncoder: Sized {
+    /// Consumes a GPU texture and, when ready, produces a packet.
+    ///
+    /// `lock_key` is the keyed-mutex value the texture was last released
+    /// with; write the value to release the texture with into `next_key`.
     fn encode_texture(
         &mut self,
         handle: u32,
@@ -71,19 +120,32 @@ pub trait EncodeTextureEncoder: Sized {
     ) -> Result<EncodeStatus, EncodeError>;
 }
 
+/// Provides codec-level out-of-band data (extradata).
+///
+/// Used for codec configuration blobs such as H.264 SPS/PPS, HEVC
+/// VPS/SPS/PPS, or AAC AudioSpecificConfig. Enable with
+/// [`EncoderInfoBuilder::enable_get_extra_data`](super::EncoderInfoBuilder::enable_get_extra_data).
 pub trait GetExtraDataEncoder: Sized {
-    /// Append codec-extradata (SPS/PPS, AAC config, etc.) into `out` and
-    /// return `true`. Return `false` if no extra data is available.
+    /// Appends extradata bytes to `out` and returns `true`. Returns `false`
+    /// if no extradata is available.
     fn get_extra_data(&mut self, out: &mut Vec<u8>) -> bool;
 }
 
+/// Provides SEI (Supplemental Enhancement Information) payload bytes.
+///
+/// Enable with
+/// [`EncoderInfoBuilder::enable_get_sei_data`](super::EncoderInfoBuilder::enable_get_sei_data).
 pub trait GetSeiDataEncoder: Sized {
-    /// Append SEI payload bytes into `out` and return `true`. Return `false`
-    /// if no SEI is available.
+    /// Appends SEI payload bytes to `out` and returns `true`. Returns
+    /// `false` if no SEI is available.
     fn get_sei_data(&mut self, out: &mut Vec<u8>) -> bool;
 }
 
-/// Audio-only: number of audio frames the encoder consumes per call.
+/// Reports the audio frame size consumed per encode call.
+///
+/// Required for audio encoders. Enable with
+/// [`EncoderInfoBuilder::enable_get_frame_size`](super::EncoderInfoBuilder::enable_get_frame_size).
 pub trait GetFrameSizeEncoder: Sized {
+    /// Returns the number of audio frames the encoder consumes per call.
     fn get_frame_size(&self) -> usize;
 }

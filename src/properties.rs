@@ -62,8 +62,15 @@ native_enum!(EditableListType, obs_editable_list_type {
     FilesAndUrls => OBS_EDITABLE_LIST_TYPE_FILES_AND_URLS,
 });
 
-/// Wrapper around [`obs_properties_t`], which is used by
-/// OBS to generate a user-friendly configuration UI.
+/// A tree of properties OBS renders as the source-, output-, or
+/// encoder-settings UI.
+///
+/// `Properties` wraps libobs's `obs_properties_t` and is constructed by
+/// the optional `get_properties` callbacks — for example
+/// [`GetPropertiesSource`](crate::source::traits::GetPropertiesSource).
+/// Add fields with [`Properties::add`] (for boolean, numeric, text,
+/// path, color, font, and editable-list types) and
+/// [`Properties::add_list`] (for combo/dropdown lists).
 pub struct Properties {
     pointer: *mut obs_properties_t,
 }
@@ -83,6 +90,7 @@ impl Default for Properties {
 }
 
 impl Properties {
+    /// Creates a new, empty property tree.
     pub fn new() -> Self {
         unsafe {
             let ptr = obs_properties_create();
@@ -90,6 +98,8 @@ impl Properties {
         }
     }
 
+    /// Adds a single property with key `name` and a localized
+    /// `description` shown alongside the field.
     pub fn add<T: ObsProp>(&mut self, name: &CStr, description: &CStr, prop: T) -> &mut Self {
         unsafe {
             prop.add_to_props(self.pointer, name, description);
@@ -97,6 +107,12 @@ impl Properties {
         self
     }
 
+    /// Adds a list (combo box) property and returns a [`ListProp`] handle
+    /// for populating its items.
+    ///
+    /// When `editable` is true the user can also type free-form values;
+    /// otherwise the list is restricted to the items added via
+    /// [`ListProp::push`] / [`ListProp::insert`].
     pub fn add_list<T: ListType>(
         &mut self,
         name: &CStr,
@@ -121,8 +137,11 @@ impl Properties {
     }
 }
 
-/// Wrapper around [`obs_property_t`], which is a list of possible values for a
-/// property.
+/// A handle for populating the items of a list (combo box) property.
+///
+/// Returned from [`Properties::add_list`]. The lifetime parameter ties
+/// the handle to its parent [`Properties`]; the handle does not own the
+/// underlying memory.
 pub struct ListProp<'props, T> {
     raw: *mut obs_property_t,
     _props: PhantomData<&'props mut Properties>,
@@ -156,20 +175,24 @@ impl<T> PtrWrapper for ListProp<'_, T> {
 }
 
 impl<T: ListType> ListProp<'_, T> {
+    /// Appends an entry with display label `name` and underlying `value`.
     pub fn push(&mut self, name: &CStr, value: T) {
         value.push_into(self.raw, name);
     }
 
+    /// Inserts an entry at `index`, shifting later entries down.
     pub fn insert(&mut self, index: usize, name: &CStr, value: T) {
         value.insert_into(self.raw, name, index);
     }
 
+    /// Removes the entry at `index`.
     pub fn remove(&mut self, index: usize) {
         unsafe {
             obs_property_list_item_remove(self.raw, index as size_t);
         }
     }
 
+    /// Greys out the entry at `index` so it cannot be selected.
     pub fn disable(&mut self, index: usize, disabled: bool) {
         unsafe {
             obs_property_list_item_disable(self.raw, index as size_t, disabled);
@@ -177,9 +200,16 @@ impl<T: ListType> ListProp<'_, T> {
     }
 }
 
+/// A type that can be the underlying value of a [`ListProp`] entry.
+///
+/// Implemented for [`CString`], [`i64`], and [`f64`] — the three value
+/// shapes OBS combo boxes can store.
 pub trait ListType {
+    /// Returns the [`ComboFormat`] this implementation produces.
     fn format() -> ComboFormat;
+    /// Appends `self` as an entry on the underlying property.
     fn push_into(self, ptr: *mut obs_property_t, name: &CStr);
+    /// Inserts `self` at `index` on the underlying property.
     fn insert_into(self, ptr: *mut obs_property_t, name: &CStr, index: usize);
 }
 
@@ -241,9 +271,19 @@ enum NumberType {
     Integer,
     Float,
 }
-/// ## Panics
-/// This type of property may cause panic when being added to the properties
-/// if the provided `min`, `max` or `step` exceeds [`c_int`].
+
+/// A numeric property — either an integer or a floating-point field —
+/// with an optional slider presentation.
+///
+/// Construct with [`NumberProp::new_int`] for integer fields or
+/// [`NumberProp::new_float`] for floating-point fields, then refine
+/// using the builder methods. Add to a [`Properties`] via
+/// [`Properties::add`].
+///
+/// # Panics
+///
+/// When added to a [`Properties`], integer variants panic if `min`,
+/// `max`, or `step` does not fit in a [`c_int`].
 pub struct NumberProp<T> {
     min: T,
     max: T,
@@ -253,7 +293,8 @@ pub struct NumberProp<T> {
 }
 
 impl<T: PrimInt> NumberProp<T> {
-    /// Creates a new integer property with step set to 1.
+    /// Creates a new integer property covering the full range of `T`,
+    /// with a step of 1.
     pub fn new_int() -> Self {
         Self {
             min: T::min_value(),
@@ -266,7 +307,8 @@ impl<T: PrimInt> NumberProp<T> {
 }
 
 impl<T: Float> NumberProp<T> {
-    /// Creates a new float property with a certain step.
+    /// Creates a new floating-point property covering the full range of
+    /// `T`, with the given `step` size.
     pub fn new_float(step: T) -> Self {
         Self {
             min: T::min_value(),
@@ -279,13 +321,17 @@ impl<T: Float> NumberProp<T> {
 }
 
 impl<T: Num + Bounded + Copy> NumberProp<T> {
-    /// Sets the step of the property.
+    /// Sets the increment between adjacent valid values.
     pub fn with_step(mut self, step: T) -> Self {
         self.step = step;
         self
     }
-    /// Sets the range of the property, inclusion and exclustion are calucated
-    /// based on the **current step**.
+
+    /// Sets the value range from a Rust [`RangeBounds`].
+    ///
+    /// Excluded bounds are converted to inclusive bounds by adding or
+    /// subtracting the current step, so the result depends on the step
+    /// configured at the time of this call.
     pub fn with_range<R: RangeBounds<T>>(mut self, range: R) -> Self {
         use std::ops::Bound::*;
         self.min = match range.start_bound() {
@@ -302,19 +348,24 @@ impl<T: Num + Bounded + Copy> NumberProp<T> {
 
         self
     }
-    /// Sets this property as a slider.
+    /// Renders the property as a slider rather than a spin box.
     pub fn with_slider(mut self) -> Self {
         self.slider = true;
         self
     }
 }
 
+/// A type that can be added to a [`Properties`] tree.
+///
+/// Each implementation describes a specific OBS field type
+/// ([`BoolProp`], [`TextProp`], [`NumberProp`], [`ColorProp`],
+/// [`FontProp`], [`PathProp`], [`EditableListProp`], …).
 pub trait ObsProp {
-    /// Callback to add this property to a [`obs_properties_t`].
+    /// Adds this property to the given `obs_properties_t`.
     ///
     /// # Safety
     ///
-    /// Must call with a valid pointer.
+    /// `p` must be a valid `obs_properties_t*`.
     unsafe fn add_to_props(self, p: *mut obs_properties_t, name: &CStr, description: &CStr);
 }
 
@@ -368,6 +419,7 @@ impl<T: ToPrimitive> ObsProp for NumberProp<T> {
     }
 }
 
+/// A boolean checkbox property.
 pub struct BoolProp;
 
 impl ObsProp for BoolProp {
@@ -375,11 +427,14 @@ impl ObsProp for BoolProp {
         obs_properties_add_bool(p, name.as_ptr(), description.as_ptr());
     }
 }
+
+/// A text-input property — single-line, password-masked, or multiline.
 pub struct TextProp {
     typ: TextType,
 }
 
 impl TextProp {
+    /// Creates a text property of the given `typ`.
     pub fn new(typ: TextType) -> Self {
         Self { typ }
     }
@@ -391,6 +446,7 @@ impl ObsProp for TextProp {
     }
 }
 
+/// A color-picker property.
 pub struct ColorProp;
 
 impl ObsProp for ColorProp {
@@ -399,13 +455,15 @@ impl ObsProp for ColorProp {
     }
 }
 
-/// Adds a font selection property.
+/// A font-selection property.
 ///
-/// A font is an obs_data sub-object which contains the following items:
-/// * face:   face name string
-/// * style:  style name string
-/// * size:   size integer
-/// * flags:  font flags integer (OBS_FONT_* defined above)
+/// The selected value is stored as a nested [`DataObj`](crate::data::DataObj)
+/// with the following fields:
+///
+/// * `face` — typeface name (string).
+/// * `style` — style name (string).
+/// * `size` — size in points (integer).
+/// * `flags` — bitmask of `OBS_FONT_*` flags (integer).
 pub struct FontProp;
 
 impl ObsProp for FontProp {
@@ -414,21 +472,15 @@ impl ObsProp for FontProp {
     }
 }
 
-/// Adds a 'path' property.  Can be a directory or a file.
+/// A file or directory picker property.
 ///
-/// If target is a file path, the filters should be this format, separated by
-/// double semi-colens, and extensions separated by space:
+/// File pickers may carry a filter expression in OBS's native syntax, in
+/// which file-type groups are separated by double semicolons and
+/// extensions inside a group are separated by spaces. For example:
 ///
+/// ```text
 /// "Example types 1 and 2 (*.ex1 *.ex2);;Example type 3 (*.ex3)"
-///
-/// Arguments
-/// * `props`: Properties object
-/// * `name`: Settings name
-/// * `description`: Description (display name) of the property
-/// * `type`: Type of path (directory or file)
-/// * `filter`: If type is a file path, then describes the file filter that the
-///   user can browse.  Items are separated via double semi-colens.  If multiple
-///   file types in a filter, separate with space.
+/// ```
 pub struct PathProp {
     typ: PathType,
     filter: Option<CString>,
@@ -436,6 +488,7 @@ pub struct PathProp {
 }
 
 impl PathProp {
+    /// Creates a new path property of the given `typ`.
     pub fn new(typ: PathType) -> Self {
         Self {
             typ,
@@ -444,11 +497,14 @@ impl PathProp {
         }
     }
 
+    /// Sets the file-type filter for file pickers. Has no visible effect
+    /// for directory pickers.
     pub fn with_filter(mut self, f: impl Into<CString>) -> Self {
         self.filter = Some(f.into());
         self
     }
 
+    /// Sets the directory the picker opens to by default.
     pub fn with_default_path(mut self, d: impl Into<CString>) -> Self {
         self.default_path = Some(d.into());
         self
@@ -468,6 +524,8 @@ impl ObsProp for PathProp {
     }
 }
 
+/// An editable list property (a user-managed list of strings, files, or
+/// URLs).
 pub struct EditableListProp {
     typ: EditableListType,
     filter: Option<CString>,
@@ -475,6 +533,7 @@ pub struct EditableListProp {
 }
 
 impl EditableListProp {
+    /// Creates a new editable-list property of the given `typ`.
     pub fn new(typ: EditableListType) -> Self {
         Self {
             typ,
@@ -483,11 +542,13 @@ impl EditableListProp {
         }
     }
 
+    /// Sets the file-type filter, in OBS's native filter syntax.
     pub fn with_filter(mut self, f: impl Into<CString>) -> Self {
         self.filter = Some(f.into());
         self
     }
 
+    /// Sets the directory the picker opens to by default.
     pub fn with_default_path(mut self, d: impl Into<CString>) -> Self {
         self.default_path = Some(d.into());
         self

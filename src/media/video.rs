@@ -63,84 +63,127 @@ native_enum!(VideoFormat, video_format {
     YA2L => VIDEO_FORMAT_YA2L,
 });
 
+/// A view of a video frame flowing through a source's filter callback.
+///
+/// `VideoDataSourceContext` wraps the `obs_source_frame` libobs hands to
+/// CPU-side video filters such as
+/// [`FilterVideoSource::filter_video`](crate::source::traits::FilterVideoSource::filter_video).
+///
+/// [`AsyncVideoSource::output_video`]: crate::source::push::AsyncVideoSource::output_video
 pub struct VideoDataSourceContext {
     pointer: *mut obs_source_frame,
 }
 
 impl VideoDataSourceContext {
+    /// Wraps a raw `obs_source_frame*`.
     pub fn from_raw(pointer: *mut obs_source_frame) -> Self {
         Self { pointer }
     }
 
+    /// Returns the frame's pixel format, or `None` if libobs reports an
+    /// unknown value.
     pub fn format(&self) -> Option<VideoFormat> {
         let raw = unsafe { (*self.pointer).format };
 
         VideoFormat::from_raw(raw).ok()
     }
 
+    /// Returns the frame width in pixels.
     pub fn width(&self) -> u32 {
         unsafe { (*self.pointer).width }
     }
 
+    /// Returns the frame height in pixels.
     pub fn height(&self) -> u32 {
         unsafe { (*self.pointer).height }
     }
 
+    /// Returns a raw pointer to plane `idx`.
     pub fn data_buffer(&self, idx: usize) -> *mut u8 {
         unsafe { (*self.pointer).data[idx] }
     }
 
+    /// Returns the row stride in bytes for plane `idx`.
     pub fn linesize(&self, idx: usize) -> u32 {
         unsafe { (*self.pointer).linesize[idx] }
     }
 
+    /// Returns the frame's presentation timestamp, in nanoseconds.
     pub fn timestamp(&self) -> u64 {
         unsafe { (*self.pointer).timestamp }
     }
 }
 
+/// A view of the video buffer libobs delivers to an output's
+/// [`RawVideoOutput::raw_video`] callback.
+///
+/// [`RawVideoOutput::raw_video`]: crate::output::traits::RawVideoOutput::raw_video
 pub struct VideoDataOutputContext {
     pointer: *mut video_data,
 }
 
 impl VideoDataOutputContext {
+    /// Wraps a raw `video_data*`.
     pub fn from_raw(pointer: *mut video_data) -> Self {
         Self { pointer }
     }
 
+    /// Returns a raw pointer to plane `idx`.
     pub fn data_buffer(&self, idx: usize) -> *mut u8 {
         unsafe { (*self.pointer).data[idx] }
     }
 
+    /// Returns the row stride in bytes for plane `idx`.
     pub fn linesize(&self, idx: usize) -> u32 {
         unsafe { (*self.pointer).linesize[idx] }
     }
 
+    /// Returns the buffer's presentation timestamp, in nanoseconds.
     pub fn timestamp(&self) -> u64 {
         unsafe { (*self.pointer).timestamp }
     }
 }
 
+/// Owned snapshot of a video output's configuration.
 #[allow(unused)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct VideoInfo {
+    /// Frame width in pixels.
     pub width: u32,
+    /// Frame height in pixels.
     pub height: u32,
+    /// Output frame rate.
     pub frame_rate: f64,
+    /// Pixel format, or `None` if libobs reports an unknown value.
     pub format: Option<VideoFormat>,
 }
 
+/// Per-format description of a video frame's plane layout.
+///
+/// Returned by [`VideoInfo::frame_size`]; used by callers that need to
+/// allocate or size buffers for a frame in a specific [`VideoFormat`].
 pub enum FrameSize {
+    /// The format is unknown or has zero planes.
     Unknown,
+    /// `count` planes, each of `size` bytes.
     Planes { size: usize, count: usize },
+    /// A single plane of the given size.
     OnePlane(usize),
+    /// Two planes of the given sizes.
     TwoPlane(usize, usize),
+    /// Three planes of the given sizes.
     ThreePlane(usize, usize, usize),
+    /// Four planes of the given sizes.
     FourPlane(usize, usize, usize, usize),
 }
 
 impl VideoInfo {
-    /// see https://github.com/obsproject/obs-studio/blob/a1e8075fba09f3b56ed43ead64cc3e340dd7a059/libobs/media-io/video-frame.c#L23
+    /// Returns the per-plane buffer size for this video configuration.
+    ///
+    /// The layout follows libobs's `video-frame.c` reference; see the
+    /// [upstream source][src] for the authoritative formulae.
+    ///
+    /// [src]: https://github.com/obsproject/obs-studio/blob/a1e8075fba09f3b56ed43ead64cc3e340dd7a059/libobs/media-io/video-frame.c#L23
     pub fn frame_size(&self) -> FrameSize {
         use VideoFormat::*;
         let width = self.width as usize;
@@ -187,17 +230,25 @@ impl VideoInfo {
     }
 }
 
+/// A handle to an OBS video output (`video_t`).
+///
+/// `VideoRef` exposes read-only inspection of the video output's
+/// dimensions, frame rate, and pixel format. It is not reference-counted;
+/// libobs owns the underlying object.
 #[allow(unused)]
 pub struct VideoRef {
+    /// Pointer to the underlying `video_t`.
     pub pointer: *mut video_t,
 }
 
 #[allow(unused)]
 impl VideoRef {
+    /// Wraps a raw `video_t*`.
     pub fn from_raw(pointer: *mut video_t) -> Self {
         Self { pointer }
     }
 
+    /// Returns a snapshot of the video output's configuration.
     pub fn info(&self) -> VideoInfo {
         VideoInfo {
             width: self.width(),
@@ -207,18 +258,23 @@ impl VideoRef {
         }
     }
 
+    /// Returns the output width, in pixels.
     pub fn width(&self) -> u32 {
         unsafe { video_output_get_width(self.pointer) }
     }
 
+    /// Returns the output height, in pixels.
     pub fn height(&self) -> u32 {
         unsafe { video_output_get_height(self.pointer) }
     }
 
+    /// Returns the output frame rate.
     pub fn frame_rate(&self) -> f64 {
         unsafe { video_output_get_frame_rate(self.pointer) }
     }
 
+    /// Returns the pixel format, or `None` if libobs reports an unknown
+    /// value.
     pub fn format(&self) -> Option<VideoFormat> {
         let raw = unsafe { video_output_get_format(self.pointer) };
 

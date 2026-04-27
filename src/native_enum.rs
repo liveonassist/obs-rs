@@ -1,3 +1,8 @@
+/// The error returned when an integer cannot be matched to any variant
+/// of an `obs-rs` enum mirror.
+///
+/// Produced by the `from_raw` helper that the [`native_enum!`] macro
+/// generates for each enum.
 #[derive(Debug)]
 pub struct NativeParsingError {
     struct_name: &'static str,
@@ -22,6 +27,20 @@ impl std::fmt::Display for NativeParsingError {
 
 impl std::error::Error for NativeParsingError {}
 
+/// Defines a Rust enum that mirrors a libobs C enum, with conversions
+/// to and from the underlying integer representation.
+///
+/// The macro expands to:
+///
+/// * The Rust enum itself, deriving `Debug`, `Clone`, `Copy`, `Eq`, and
+///   `PartialEq`.
+/// * Inherent `as_raw` and `from_raw` methods for explicit conversion to
+///   and from the C enum's integer type. `from_raw` returns a
+///   `Result<Self, NativeParsingError>`.
+/// * `From<Self>` and `TryFrom<i32>` impls for use with the standard
+///   conversion traits.
+///
+/// Used internally; plugin code typically only sees the resulting enum.
 #[macro_export]
 macro_rules! native_enum {
     ($(#[$($attrs_enum:tt)*])* $name:ident,$native_name:ident { $($(#[$($attrss:tt)*])* $rust:ident => $native:ident,)* }) => {

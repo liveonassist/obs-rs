@@ -8,6 +8,11 @@ use obs_rs_sys::{
 
 use super::Result;
 
+/// A reference-counted handle to an OBS scene (`obs_scene_t`).
+///
+/// A scene is a layered composition of sources. `SceneRef` exposes the
+/// scene's identity, conversion to the underlying [`SourceRef`], and a
+/// helper for adding a source as a new scene item.
 pub struct SceneRef {
     inner: *mut obs_scene_t,
 }
@@ -24,10 +29,12 @@ impl std::fmt::Debug for SceneRef {
 impl_ptr_wrapper!(@ptr: inner, SceneRef, obs_scene_t, obs_scene_get_ref, obs_scene_release);
 
 impl SceneRef {
+    /// Returns the user-visible name of the scene.
     pub fn name(&self) -> Result<CString> {
         self.as_source().name()
     }
 
+    /// Returns the underlying [`SourceRef`] for this scene.
     pub fn as_source(&self) -> SourceRef {
         let ptr = unsafe {
             // as doc said "The scene’s source. Does not increment the reference"
@@ -37,6 +44,7 @@ impl SceneRef {
         SourceRef::from_raw(ptr).expect("obs_scene_get_source")
     }
 
+    /// Adds `source` to the scene and returns the resulting scene item.
     pub fn add_source(&self, source: SourceRef) -> SceneItemRef {
         let ptr = unsafe {
             // add ref for source, Docs said "A new scene item for a source within a scene.  Does not
@@ -47,6 +55,11 @@ impl SceneRef {
     }
 }
 
+/// A reference-counted handle to an OBS scene item (`obs_sceneitem_t`).
+///
+/// A scene item is the binding of a single [`SourceRef`] into a
+/// [`SceneRef`], carrying its position, scale, visibility, and other
+/// per-instance state.
 pub struct SceneItemRef {
     inner: *mut obs_sceneitem_t,
 }
@@ -60,6 +73,7 @@ impl_ptr_wrapper!(
 );
 
 impl SceneItemRef {
+    /// Returns whether the scene item is currently visible.
     pub fn visible(&self) -> bool {
         unsafe { obs_sceneitem_visible(self.inner) }
     }

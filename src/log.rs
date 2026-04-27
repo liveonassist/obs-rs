@@ -3,19 +3,21 @@ use std::os::raw::c_char;
 use log::{Level, LevelFilter, Log, Metadata, Record, SetLoggerError};
 use obs_rs_sys::{_bindgen_ty_1, LOG_DEBUG, LOG_ERROR, LOG_INFO, LOG_WARNING, blog};
 
-/// A logger that plugs into OBS's logging system.
+/// A bridge from the [`log`] crate to OBS's logging subsystem.
 ///
-/// Since OBS only has 4 logging levels and the lowest level is
-/// only enabled in debug builds of OBS, this logger provides a option
-/// to promote lower-level logs as `info`.
+/// OBS exposes four log levels (`error`, `warning`, `info`, `debug`), and
+/// the `debug` level is only emitted in debug builds of OBS. To make
+/// lower-level Rust logs visible in production OBS builds, configure the
+/// logger with [`Logger::with_promote_debug`] to forward `debug` and
+/// `trace` records as `info`.
 ///
-/// You can also use any other logger implementation, but we recommend this
-/// since OBS also writes everything in its logging system to a file, which can
-/// be viewed if there is a problem and OBS is not started from a console.
+/// Plugins are free to use any [`log::Log`] implementation, but routing
+/// through OBS has the advantage that records are captured in the OBS
+/// log file in addition to the console.
 ///
 /// # Examples
 ///
-/// A new logger with default settings.
+/// Install a logger with default settings:
 ///
 /// ```compile_fail
 /// let _ = Logger::new().init();
@@ -35,29 +37,35 @@ impl Default for Logger {
 }
 
 impl Logger {
-    /// Creates a new logger with default levle set to [`Level::Trace`] and does
-    /// not promote debug logs.
+    /// Creates a new logger with [`LevelFilter::Trace`] as the maximum
+    /// level and debug-log promotion disabled.
     #[must_use = "You must call init() to begin logging"]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Initializes this logger, setting this as the global logger. This MUST be
-    /// called to be effective. This may fail if there is already a logger.
+    /// Installs this logger as the global [`log`] sink.
+    ///
+    /// Returns [`SetLoggerError`] if another logger has already been
+    /// installed.
     pub fn init(self) -> Result<(), SetLoggerError> {
         log::set_max_level(self.max_level);
         log::set_boxed_logger(Box::new(self))?;
         Ok(())
     }
 
-    /// Sets whether to promote [`Level::Debug`] and [`Level::Trace`] logs.
+    /// Configures whether [`Level::Debug`] and [`Level::Trace`] records
+    /// are forwarded to OBS's `info` channel.
+    ///
+    /// Useful when targeting release builds of OBS, which suppress the
+    /// `debug` channel.
     #[must_use = "You must call init() to begin logging"]
     pub fn with_promote_debug(mut self, promote_debug: bool) -> Self {
         self.promote_debug = promote_debug;
         self
     }
 
-    /// Sets the maximum logging level.
+    /// Sets the maximum log level the logger will forward.
     #[must_use = "You must call init() to begin logging"]
     pub fn with_max_level(mut self, max_level: LevelFilter) -> Self {
         self.max_level = max_level;
