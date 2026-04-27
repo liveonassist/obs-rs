@@ -8,10 +8,18 @@ use crate::media::{audio::AudioDataContext, video::VideoDataSourceContext};
 use crate::properties::Properties;
 use crate::string::ObsString;
 
+/// Boxed error type returned from fallible plugin entrypoints. Any error
+/// type the user prefers (`anyhow::Error`, `&'static str`, custom enums)
+/// converts into this via `Into`.
+pub type CreateError = Box<dyn std::error::Error + Send + Sync>;
+
 pub trait Sourceable: Sized {
     fn get_id() -> ObsString;
     fn get_type() -> SourceType;
-    fn create(create: &mut CreatableSourceContext<Self>, source: SourceRef) -> Self;
+    fn create(
+        create: &mut CreatableSourceContext<Self>,
+        source: SourceRef,
+    ) -> Result<Self, CreateError>;
 }
 
 macro_rules! simple_trait_mut {

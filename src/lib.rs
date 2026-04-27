@@ -64,8 +64,8 @@
 //!     fn create(
 //!         create: &mut CreatableSourceContext<Self>,
 //!         _source: SourceRef
-//!     ) -> Self {
-//!         Self
+//!     ) -> Result<Self, CreateError> {
+//!         Ok(Self)
 //!     }
 //! }
 //!

@@ -125,7 +125,10 @@ impl Sourceable for AvatarSource {
         SourceType::Input
     }
 
-    fn create(create: &mut CreatableSourceContext<Self>, source: SourceRef) -> Self {
+    fn create(
+        create: &mut CreatableSourceContext<Self>,
+        source: SourceRef,
+    ) -> Result<Self, CreateError> {
         let settings = &create.settings;
 
         // Получаем путь к директории аватара
@@ -216,7 +219,7 @@ impl Sourceable for AvatarSource {
             eprintln!("Failed to load avatar from: {:?}", avatar_path);
         }
 
-        Self {
+        Ok(Self {
             source,
             loader: AvatarLoader::new(),
             texture_cache: TextureCache::new(),
@@ -246,7 +249,7 @@ impl Sourceable for AvatarSource {
                     }
                 }
             },
-        }
+        })
     }
 }
 

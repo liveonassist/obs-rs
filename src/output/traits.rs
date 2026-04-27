@@ -3,10 +3,14 @@ use obs_rs_sys::{audio_data, encoder_packet, video_data};
 use crate::{prelude::DataObj, properties::Properties, string::ObsString};
 
 use super::{CreatableOutputContext, OutputRef};
+use crate::source::traits::CreateError;
 
 pub trait Outputable: Sized {
     fn get_id() -> ObsString;
-    fn create(context: &mut CreatableOutputContext<'_, Self>, output: OutputRef) -> Self;
+    fn create(
+        context: &mut CreatableOutputContext<'_, Self>,
+        output: OutputRef,
+    ) -> Result<Self, CreateError>;
 
     fn start(&mut self) -> bool {
         true

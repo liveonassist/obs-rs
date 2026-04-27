@@ -72,7 +72,14 @@ pub unsafe extern "C" fn create<D: Outputable>(
         return std::ptr::null_mut();
     };
 
-    let data = D::create(&mut context, output_context);
+    let data = match D::create(&mut context, output_context) {
+        Ok(data) => data,
+        Err(e) => {
+            log::error!("output::create for `{}` failed: {}", D::get_id().display(), e);
+            forget(context.settings);
+            return std::ptr::null_mut();
+        }
+    };
     let wrapper = Box::new(DataWrapper::from(data));
     forget(context.settings);
     let callbacks = context.hotkey_callbacks;

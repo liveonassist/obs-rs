@@ -121,7 +121,14 @@ pub unsafe extern "C" fn create<D: Sourceable>(
         return std::ptr::null_mut();
     };
 
-    let data = D::create(&mut context, source_context);
+    let data = match D::create(&mut context, source_context) {
+        Ok(data) => data,
+        Err(e) => {
+            log::error!("source::create for `{}` failed: {}", D::get_id().display(), e);
+            forget(context.settings);
+            return std::ptr::null_mut();
+        }
+    };
 
     let wrapper = DataWrapper::from(data);
     forget(context.settings);
