@@ -1,9 +1,11 @@
 [package]
 name = "obs-wrapper"
 version = "0.5.0-tm"
-authors = ["Bennett Hardwick <me@bennetthardwick.com>"]
+authors = [
+    "Bennett Hardwick <me@bennetthardwick.com>",
+    "Christopher Tam <ohgodtamit@gmail.com",
+]
 edition = "2024"
-rust-version = "1.95.0"
 license = "GPL-2.0"
 description = "Safe wrapper of obs-sys"
 repository = "https://github.com/TakiMoysha/rust-obs-plugins"
