@@ -64,18 +64,18 @@ use std::path::PathBuf;
 
 use obs_rs_sys::{
     bfree, config_t, obs_frontend_defer_save_begin, obs_frontend_defer_save_end,
-    obs_frontend_get_app_config, obs_frontend_get_current_preview_scene,
-    obs_frontend_get_current_profile, obs_frontend_get_current_profile_path,
-    obs_frontend_get_current_record_output_path, obs_frontend_get_current_scene,
-    obs_frontend_get_current_scene_collection, obs_frontend_get_current_transition,
-    obs_frontend_get_global_config, obs_frontend_get_last_recording, obs_frontend_get_last_replay,
+    obs_frontend_get_current_preview_scene, obs_frontend_get_current_profile,
+    obs_frontend_get_current_profile_path, obs_frontend_get_current_record_output_path,
+    obs_frontend_get_current_scene, obs_frontend_get_current_scene_collection,
+    obs_frontend_get_current_transition, obs_frontend_get_global_config,
+    obs_frontend_get_last_recording, obs_frontend_get_last_replay,
     obs_frontend_get_last_screenshot, obs_frontend_get_locale_string, obs_frontend_get_main_window,
     obs_frontend_get_main_window_handle, obs_frontend_get_profile_config,
     obs_frontend_get_recording_output, obs_frontend_get_replay_buffer_output,
     obs_frontend_get_streaming_output, obs_frontend_get_streaming_service,
     obs_frontend_get_system_tray, obs_frontend_get_tbar_position,
-    obs_frontend_get_transition_duration, obs_frontend_get_user_config,
-    obs_frontend_get_virtualcam_output, obs_frontend_is_theme_dark, obs_frontend_open_projector,
+    obs_frontend_get_transition_duration, obs_frontend_get_virtualcam_output,
+    obs_frontend_is_theme_dark, obs_frontend_open_projector,
     obs_frontend_open_sceneitem_edit_transform, obs_frontend_open_source_filters,
     obs_frontend_open_source_interaction, obs_frontend_open_source_properties,
     obs_frontend_pop_ui_translation, obs_frontend_preview_enabled,
@@ -95,6 +95,8 @@ use obs_rs_sys::{
     obs_frontend_streaming_stop, obs_frontend_take_screenshot, obs_frontend_take_source_screenshot,
     obs_frontend_virtualcam_active, obs_service_t,
 };
+#[cfg(any(feature = "obs-31", feature = "obs-32"))]
+use obs_rs_sys::{obs_frontend_get_app_config, obs_frontend_get_user_config};
 
 use crate::source::SourceRef;
 use crate::wrapper::PtrWrapper;
@@ -544,30 +546,35 @@ pub unsafe fn profile_config() -> ConfigHandle {
     unsafe { obs_frontend_get_profile_config() }
 }
 
-/// **Deprecated** in OBS 30+. Use [`app_config`] / [`user_config`] instead.
+/// **Deprecated** in OBS 31+. Use [`app_config`] / [`user_config`] instead.
 ///
 /// # Safety
 ///
 /// Same as [`profile_config`].
-#[deprecated(note = "Use app_config or user_config (OBS 31+)")]
+#[cfg_attr(
+    any(feature = "obs-31", feature = "obs-32"),
+    deprecated(note = "Use app_config or user_config (OBS 31+)")
+)]
 pub unsafe fn global_config() -> ConfigHandle {
     unsafe { obs_frontend_get_global_config() }
 }
 
-/// Application-level configuration shared across users.
+/// Application-level configuration shared across users. **OBS 31+ only.**
 ///
 /// # Safety
 ///
 /// Same as [`profile_config`].
+#[cfg(any(feature = "obs-31", feature = "obs-32"))]
 pub unsafe fn app_config() -> ConfigHandle {
     unsafe { obs_frontend_get_app_config() }
 }
 
-/// User-level configuration.
+/// User-level configuration. **OBS 31+ only.**
 ///
 /// # Safety
 ///
 /// Same as [`profile_config`].
+#[cfg(any(feature = "obs-31", feature = "obs-32"))]
 pub unsafe fn user_config() -> ConfigHandle {
     unsafe { obs_frontend_get_user_config() }
 }

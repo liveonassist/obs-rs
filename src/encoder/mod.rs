@@ -35,11 +35,13 @@ use std::marker::PhantomData;
 use enumflags2::{BitFlags, bitflags};
 use obs_rs_sys::{
     OBS_ENCODER_CAP_DEPRECATED, OBS_ENCODER_CAP_DYN_BITRATE, OBS_ENCODER_CAP_INTERNAL,
-    OBS_ENCODER_CAP_PASS_TEXTURE, OBS_ENCODER_CAP_ROI, OBS_ENCODER_CAP_SCALING, obs_encoder_get_codec,
+    OBS_ENCODER_CAP_PASS_TEXTURE, OBS_ENCODER_CAP_ROI, obs_encoder_get_codec,
     obs_encoder_get_height, obs_encoder_get_id, obs_encoder_get_name, obs_encoder_get_ref,
     obs_encoder_get_width, obs_encoder_info, obs_encoder_release, obs_encoder_t, obs_encoder_type,
     obs_encoder_type_OBS_ENCODER_AUDIO, obs_encoder_type_OBS_ENCODER_VIDEO,
 };
+#[cfg(any(feature = "obs-31", feature = "obs-32"))]
+use obs_rs_sys::OBS_ENCODER_CAP_SCALING;
 use paste::item;
 
 use std::ffi::CString;
@@ -70,6 +72,24 @@ impl EncoderType {
 
 /// Encoder capability flags. OR them with `|` to compose; pass to
 /// [`EncoderInfoBuilder::with_caps`].
+//
+// Split into per-version enum bodies because `enumflags2`'s `#[bitflags]`
+// attribute does not propagate `#[cfg]` on individual variants — the impl
+// code it expands references every variant unconditionally. Keeping the cfg
+// at item level avoids that.
+#[cfg(feature = "obs-30")]
+#[bitflags]
+#[repr(u32)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum EncoderCap {
+    Deprecated = OBS_ENCODER_CAP_DEPRECATED,
+    PassTexture = OBS_ENCODER_CAP_PASS_TEXTURE,
+    DynBitrate = OBS_ENCODER_CAP_DYN_BITRATE,
+    Internal = OBS_ENCODER_CAP_INTERNAL,
+    Roi = OBS_ENCODER_CAP_ROI,
+}
+
+#[cfg(any(feature = "obs-31", feature = "obs-32"))]
 #[bitflags]
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
