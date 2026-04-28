@@ -2,7 +2,7 @@ use std::ffi::{CStr, CString};
 
 use obs_rs_sys::{
     obs_data_t, obs_enum_service_types, obs_enum_services, obs_get_service_by_name,
-    obs_service_apply_encoder_settings, obs_service_can_try_to_connect,
+    obs_service_apply_encoder_settings, obs_service_can_try_to_connect, obs_service_connect_info,
     obs_service_connect_info_OBS_SERVICE_CONNECT_INFO_BEARER_TOKEN,
     obs_service_connect_info_OBS_SERVICE_CONNECT_INFO_ENCRYPT_PASSPHRASE,
     obs_service_connect_info_OBS_SERVICE_CONNECT_INFO_PASSWORD,
@@ -48,11 +48,33 @@ impl Resolution {
 }
 
 /// One of the connect-info fields requested by libobs through
-/// [`GetConnectInfoService`](super::traits::GetConnectInfoService).
 ///
-/// Mirrors `obs_service_connect_info`. Unknown values are preserved
+/// Mirrors [`obs_service_connect_info`]. Unknown values are preserved
 /// through the [`Other`](Self::Other) variant so newer libobs revisions
 /// that introduce additional fields don't break existing services.
+///
+/// # Platform-specific raw representation
+///
+/// libobs declares `obs_service_connect_info` as an unnamed C enum.
+/// bindgen picks the underlying Rust type from whatever the C compiler
+/// would have used:
+///
+/// * On Unix-like targets, GCC/Clang give unsigned-only enums an
+///   unsigned underlying type, so bindgen emits `c_uint` (i.e. [`u32`]).
+/// * On Windows MSVC, every unnamed enum is signed `int` regardless of
+///   its values, so bindgen emits `c_int` (i.e. [`i32`]).
+///
+/// To keep the FFI surface honest, [`as_raw`](Self::as_raw) and
+/// [`from_raw`](Self::from_raw) speak in the bindgen-emitted
+/// [`obs_service_connect_info`] type alias rather than picking a fixed
+/// Rust integer. That alias resolves to [`u32`] off Windows and [`i32`]
+/// on Windows, so the value can be passed to
+/// [`obs_service_get_connect_info`] (and stored in the
+/// [`obs_service_info::get_connect_info`] field) without any `as` cast at
+/// the call site.
+///
+/// [`GetConnectInfoService`]: super::traits::GetConnectInfoService
+/// [`obs_service_info::get_connect_info`]: obs_rs_sys::obs_service_info::get_connect_info
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum ConnectInfo {
     /// The ingest URL the output should connect to.
@@ -72,9 +94,12 @@ pub enum ConnectInfo {
 }
 
 impl ConnectInfo {
-    /// Maps the libobs integer kind into a [`ConnectInfo`].
-    #[allow(non_upper_case_globals)]
-    pub fn from_raw(kind: u32) -> Self {
+    /// Maps the libobs raw kind into a [`ConnectInfo`].
+    // `as u32` in the catch-all arm is a no-op on Linux (where the
+    // bindgen typedef is `c_uint`) but mandatory on Windows MSVC (where
+    // it's `c_int`); silence clippy on the platform that doesn't need it.
+    #[allow(non_upper_case_globals, non_snake_case, clippy::unnecessary_cast)]
+    pub fn from_raw(kind: obs_service_connect_info) -> Self {
         match kind {
             obs_service_connect_info_OBS_SERVICE_CONNECT_INFO_SERVER_URL => Self::ServerUrl,
             obs_service_connect_info_OBS_SERVICE_CONNECT_INFO_STREAM_KEY => Self::StreamKey,
@@ -84,12 +109,13 @@ impl ConnectInfo {
                 Self::EncryptPassphrase
             }
             obs_service_connect_info_OBS_SERVICE_CONNECT_INFO_BEARER_TOKEN => Self::BearerToken,
-            other => Self::Other(other),
+            other => Self::Other(other as u32),
         }
     }
 
-    /// Returns the underlying libobs integer kind.
-    pub fn as_raw(self) -> u32 {
+    /// Returns the underlying libobs raw kind.
+    #[allow(non_upper_case_globals, non_snake_case, clippy::unnecessary_cast)]
+    pub fn as_raw(&self) -> obs_service_connect_info {
         match self {
             Self::ServerUrl => obs_service_connect_info_OBS_SERVICE_CONNECT_INFO_SERVER_URL,
             Self::StreamKey => obs_service_connect_info_OBS_SERVICE_CONNECT_INFO_STREAM_KEY,
@@ -99,7 +125,7 @@ impl ConnectInfo {
                 obs_service_connect_info_OBS_SERVICE_CONNECT_INFO_ENCRYPT_PASSPHRASE
             }
             Self::BearerToken => obs_service_connect_info_OBS_SERVICE_CONNECT_INFO_BEARER_TOKEN,
-            Self::Other(v) => v,
+            Self::Other(v) => *v as obs_service_connect_info,
         }
     }
 }

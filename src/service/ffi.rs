@@ -4,7 +4,8 @@ use std::os::raw::{c_char, c_int};
 use std::ptr;
 
 use obs_rs_sys::{
-    obs_data_t, obs_output_t, obs_properties_t, obs_service_resolution, obs_service_t,
+    obs_data_t, obs_output_t, obs_properties_t, obs_service_connect_info, obs_service_resolution,
+    obs_service_t,
 };
 
 use super::context::{ConnectInfo, CreatableServiceContext, ServiceRef};
@@ -259,7 +260,7 @@ pub unsafe extern "C" fn get_protocol<D: GetProtocolService>(data: *mut c_void) 
 
 pub unsafe extern "C" fn get_connect_info<D: GetConnectInfoService>(
     data: *mut c_void,
-    type_: u32,
+    type_: obs_service_connect_info,
 ) -> *const c_char {
     let wrapper = &*(data as *const ServiceWrapper<D>);
     ptr_or_null(D::get_connect_info(
