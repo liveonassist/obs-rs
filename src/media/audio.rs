@@ -1,5 +1,6 @@
 use obs_sys_rs::{
     audio_data, audio_output_get_channels, audio_output_get_sample_rate, audio_t, obs_audio_data,
+    obs_audio_info, obs_get_audio, obs_get_audio_info,
 };
 
 /// A mutable view of an audio buffer flowing through a filter callback.
@@ -118,6 +119,23 @@ impl AudioRef {
     /// Wraps a raw `audio_t*`.
     pub fn from_raw(pointer: *mut audio_t) -> Self {
         Self { pointer }
+    }
+
+    /// Returns libobs's main audio output (`obs_get_audio`), or `None`
+    /// before audio is initialized.
+    ///
+    /// The handle is borrowed from libobs and is invalidated by an audio
+    /// reset or shutdown; it must not be used after either.
+    pub fn main() -> Option<Self> {
+        let pointer = unsafe { obs_get_audio() };
+        (!pointer.is_null()).then_some(Self { pointer })
+    }
+
+    /// Returns the core audio settings (`obs_get_audio_info`), or `None`
+    /// if audio is not initialized.
+    pub fn main_info() -> Option<obs_audio_info> {
+        let mut info = obs_audio_info::default();
+        unsafe { obs_get_audio_info(&mut info) }.then_some(info)
     }
 
     /// Returns a snapshot of the audio output's configuration.

@@ -8,14 +8,15 @@ use std::{
 use obs_sys_rs::{
     obs_data_array_count, obs_data_array_item, obs_data_array_release, obs_data_array_t,
     obs_data_clear, obs_data_create, obs_data_create_from_json, obs_data_create_from_json_file,
-    obs_data_create_from_json_file_safe, obs_data_erase, obs_data_get_json, obs_data_item_byname,
-    obs_data_item_get_array, obs_data_item_get_bool, obs_data_item_get_double,
-    obs_data_item_get_int, obs_data_item_get_obj, obs_data_item_get_string, obs_data_item_gettype,
-    obs_data_item_numtype, obs_data_item_release, obs_data_item_t, obs_data_number_type,
-    obs_data_number_type_OBS_DATA_NUM_DOUBLE, obs_data_number_type_OBS_DATA_NUM_INT,
-    obs_data_release, obs_data_set_default_bool, obs_data_set_default_double,
-    obs_data_set_default_int, obs_data_set_default_obj, obs_data_set_default_string, obs_data_t,
-    obs_data_type, obs_data_type_OBS_DATA_ARRAY, obs_data_type_OBS_DATA_BOOLEAN,
+    obs_data_create_from_json_file_safe, obs_data_erase, obs_data_get_bool, obs_data_get_int,
+    obs_data_get_json, obs_data_get_string, obs_data_item_byname, obs_data_item_get_array,
+    obs_data_item_get_bool, obs_data_item_get_double, obs_data_item_get_int, obs_data_item_get_obj,
+    obs_data_item_get_string, obs_data_item_gettype, obs_data_item_numtype, obs_data_item_release,
+    obs_data_item_t, obs_data_number_type, obs_data_number_type_OBS_DATA_NUM_DOUBLE,
+    obs_data_number_type_OBS_DATA_NUM_INT, obs_data_release, obs_data_set_bool,
+    obs_data_set_default_bool, obs_data_set_default_double, obs_data_set_default_int,
+    obs_data_set_default_obj, obs_data_set_default_string, obs_data_set_int, obs_data_set_string,
+    obs_data_t, obs_data_type, obs_data_type_OBS_DATA_ARRAY, obs_data_type_OBS_DATA_BOOLEAN,
     obs_data_type_OBS_DATA_NUMBER, obs_data_type_OBS_DATA_OBJECT, obs_data_type_OBS_DATA_STRING,
     size_t,
 };
@@ -323,6 +324,51 @@ impl DataObj<'_> {
     /// [`clear`]: Self::clear
     pub fn set_default<T: FromDataItem>(&mut self, name: impl AsRef<CStr>, value: impl Into<T>) {
         unsafe { T::set_default_unchecked(self.as_ptr_mut(), name.as_ref(), value.into()) }
+    }
+
+    /// Stores a string value under `name`, replacing any previous value.
+    pub fn set_string(&mut self, name: impl AsRef<CStr>, value: impl AsRef<CStr>) {
+        unsafe {
+            obs_data_set_string(self.raw, name.as_ref().as_ptr(), value.as_ref().as_ptr());
+        }
+    }
+
+    /// Stores an integer value under `name`, replacing any previous value.
+    pub fn set_int(&mut self, name: impl AsRef<CStr>, value: i64) {
+        unsafe { obs_data_set_int(self.raw, name.as_ref().as_ptr(), value) }
+    }
+
+    /// Stores a boolean value under `name`, replacing any previous value.
+    pub fn set_bool(&mut self, name: impl AsRef<CStr>, value: bool) {
+        unsafe { obs_data_set_bool(self.raw, name.as_ref().as_ptr(), value) }
+    }
+
+    /// Reads `name` with `obs_data_get_string` semantics.
+    ///
+    /// Unlike [`get`](Self::get), this falls back to the default and
+    /// autoselect values and yields an empty string for a missing or
+    /// non-string item. Returns `None` only if libobs returns null. The
+    /// value is copied before returning, so it does not borrow `self`.
+    pub fn get_string(&self, name: impl AsRef<CStr>) -> Option<CString> {
+        unsafe { cstring_from_ptr(obs_data_get_string(self.raw, name.as_ref().as_ptr())) }
+    }
+
+    /// Reads `name` with `obs_data_get_int` semantics.
+    ///
+    /// Unlike [`get`](Self::get), this falls back to the default and
+    /// autoselect values, converts floating-point numbers, and yields `0`
+    /// for a missing or non-numeric item.
+    pub fn get_int(&self, name: impl AsRef<CStr>) -> i64 {
+        unsafe { obs_data_get_int(self.raw, name.as_ref().as_ptr()) }
+    }
+
+    /// Reads `name` with `obs_data_get_bool` semantics.
+    ///
+    /// Unlike [`get`](Self::get), this falls back to the default and
+    /// autoselect values and yields `false` for a missing or non-boolean
+    /// item.
+    pub fn get_bool(&self, name: impl AsRef<CStr>) -> bool {
+        unsafe { obs_data_get_bool(self.raw, name.as_ref().as_ptr()) }
     }
 
     /// Serializes this object to a JSON string.
