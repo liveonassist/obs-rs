@@ -45,7 +45,8 @@ pub use traits::*;
 
 use obs_sys_rs::{
     OBS_SOURCE_ASYNC_VIDEO, OBS_SOURCE_AUDIO, OBS_SOURCE_CONTROLLABLE_MEDIA,
-    OBS_SOURCE_INTERACTION, OBS_SOURCE_VIDEO, obs_filter_get_target, obs_icon_type,
+    OBS_SOURCE_INTERACTION, OBS_SOURCE_VIDEO, obs_enum_input_types, obs_filter_get_target,
+    obs_get_source_by_name, obs_get_source_by_uuid, obs_icon_type,
     obs_icon_type_OBS_ICON_TYPE_AUDIO_INPUT, obs_icon_type_OBS_ICON_TYPE_AUDIO_OUTPUT,
     obs_icon_type_OBS_ICON_TYPE_BROWSER, obs_icon_type_OBS_ICON_TYPE_CAMERA,
     obs_icon_type_OBS_ICON_TYPE_COLOR, obs_icon_type_OBS_ICON_TYPE_CUSTOM,
@@ -54,10 +55,11 @@ use obs_sys_rs::{
     obs_icon_type_OBS_ICON_TYPE_SLIDESHOW, obs_icon_type_OBS_ICON_TYPE_TEXT,
     obs_icon_type_OBS_ICON_TYPE_UNKNOWN, obs_icon_type_OBS_ICON_TYPE_WINDOW_CAPTURE,
     obs_mouse_button_type, obs_mouse_button_type_MOUSE_LEFT, obs_mouse_button_type_MOUSE_MIDDLE,
-    obs_mouse_button_type_MOUSE_RIGHT, obs_source_active, obs_source_enabled,
+    obs_mouse_button_type_MOUSE_RIGHT, obs_source_active, obs_source_create, obs_source_enabled,
     obs_source_get_base_height, obs_source_get_base_width, obs_source_get_height,
-    obs_source_get_id, obs_source_get_name, obs_source_get_ref, obs_source_get_type,
-    obs_source_get_width, obs_source_info, obs_source_media_ended, obs_source_media_get_duration,
+    obs_source_get_id, obs_source_get_name, obs_source_get_private_settings, obs_source_get_ref,
+    obs_source_get_settings, obs_source_get_type, obs_source_get_uuid, obs_source_get_width,
+    obs_source_info, obs_source_is_group, obs_source_media_ended, obs_source_media_get_duration,
     obs_source_media_get_state, obs_source_media_get_time, obs_source_media_next,
     obs_source_media_play_pause, obs_source_media_previous, obs_source_media_restart,
     obs_source_media_set_time, obs_source_media_started, obs_source_media_stop,
@@ -163,6 +165,77 @@ impl_ptr_wrapper!(
 );
 
 impl SourceRef {
+    /// Creates a new public source of the registered type `id`
+    /// (`obs_source_create`).
+    ///
+    /// `settings` are copied into the new source's settings. A public
+    /// source is reachable by name and UUID until it is removed.
+    pub fn create(id: &CStr, name: &CStr, settings: Option<&DataObj<'_>>) -> Result<Self> {
+        let settings = settings.map_or(std::ptr::null_mut(), |data| unsafe { data.as_ptr_mut() });
+        let raw = unsafe {
+            obs_source_create(id.as_ptr(), name.as_ptr(), settings, std::ptr::null_mut())
+        };
+        unsafe { Self::from_raw_unchecked(raw) }.ok_or(Error::NulPointer("obs_source_create"))
+    }
+
+    /// Looks up a public source by UUID (`obs_get_source_by_uuid`).
+    pub fn by_uuid(uuid: &CStr) -> Option<Self> {
+        unsafe { Self::from_raw_unchecked(obs_get_source_by_uuid(uuid.as_ptr())) }
+    }
+
+    /// Looks up a public source by name (`obs_get_source_by_name`).
+    pub fn by_name(name: &CStr) -> Option<Self> {
+        unsafe { Self::from_raw_unchecked(obs_get_source_by_name(name.as_ptr())) }
+    }
+
+    /// Returns the registered identifier of every input source type, in
+    /// registration order (`obs_enum_input_types`).
+    pub fn input_types() -> Vec<CString> {
+        let mut types = Vec::new();
+        let mut id = std::ptr::null();
+        for idx in 0.. {
+            if !unsafe { obs_enum_input_types(idx, &mut id) } {
+                break;
+            }
+            types.extend(unsafe { cstring_from_ptr(id) });
+        }
+        types
+    }
+
+    /// Returns the source's UUID, stable across sessions once saved.
+    pub fn uuid(&self) -> Result<CString> {
+        unsafe { cstring_from_ptr(obs_source_get_uuid(self.inner)) }
+            .ok_or(Error::NulPointer("obs_source_get_uuid"))
+    }
+
+    /// Returns a new reference to the source's live settings
+    /// (`obs_source_get_settings`).
+    ///
+    /// Writes to the returned object change the source's stored settings
+    /// without notifying it; use
+    /// [`update_source_settings`](Self::update_source_settings) to apply
+    /// changes.
+    pub fn settings(&self) -> Result<DataObj<'static>> {
+        unsafe { DataObj::from_raw_unchecked(obs_source_get_settings(self.inner)) }
+            .ok_or(Error::NulPointer("obs_source_get_settings"))
+    }
+
+    /// Returns a new reference to the source's private settings
+    /// (`obs_source_get_private_settings`).
+    ///
+    /// Private settings are saved with the source but never shown to the
+    /// user or passed to the source's callbacks, so plugins can use them to
+    /// tag sources they manage. Writes apply directly.
+    pub fn private_settings(&self) -> Result<DataObj<'static>> {
+        unsafe { DataObj::from_raw_unchecked(obs_source_get_private_settings(self.inner)) }
+            .ok_or(Error::NulPointer("obs_source_get_private_settings"))
+    }
+
+    /// Returns whether this source is a scene group.
+    pub fn is_group(&self) -> bool {
+        unsafe { obs_source_is_group(self.inner) }
+    }
+
     /// Invokes `func` with the next source down the filter chain.
     ///
     /// Has no effect unless this source is a filter; sources of any other

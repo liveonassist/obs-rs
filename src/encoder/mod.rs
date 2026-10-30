@@ -90,16 +90,21 @@ use enumflags2::{BitFlags, bitflags};
 use obs_sys_rs::OBS_ENCODER_CAP_SCALING;
 use obs_sys_rs::{
     OBS_ENCODER_CAP_DEPRECATED, OBS_ENCODER_CAP_DYN_BITRATE, OBS_ENCODER_CAP_INTERNAL,
-    OBS_ENCODER_CAP_PASS_TEXTURE, OBS_ENCODER_CAP_ROI, obs_encoder_get_codec,
-    obs_encoder_get_height, obs_encoder_get_id, obs_encoder_get_name, obs_encoder_get_ref,
-    obs_encoder_get_width, obs_encoder_info, obs_encoder_release, obs_encoder_t, obs_encoder_type,
-    obs_encoder_type_OBS_ENCODER_AUDIO, obs_encoder_type_OBS_ENCODER_VIDEO,
+    OBS_ENCODER_CAP_PASS_TEXTURE, OBS_ENCODER_CAP_ROI, obs_audio_encoder_create,
+    obs_encoder_get_codec, obs_encoder_get_extra_data, obs_encoder_get_height, obs_encoder_get_id,
+    obs_encoder_get_name, obs_encoder_get_ref, obs_encoder_get_sample_rate, obs_encoder_get_width,
+    obs_encoder_info, obs_encoder_release, obs_encoder_set_audio,
+    obs_encoder_set_preferred_video_format, obs_encoder_set_video, obs_encoder_t, obs_encoder_type,
+    obs_encoder_type_OBS_ENCODER_AUDIO, obs_encoder_type_OBS_ENCODER_VIDEO, obs_get_encoder_codec,
+    obs_get_encoder_type, obs_video_encoder_create,
 };
 use paste::item;
 
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
+use std::ptr::null_mut;
 
-use crate::media::{audio::AudioRef, video::VideoRef};
+use crate::data::DataObj;
+use crate::media::{audio::AudioRef, video::VideoFormat, video::VideoRef};
 use crate::string::cstring_from_ptr;
 use crate::wrapper::PtrWrapper;
 use crate::{Error, Result};
@@ -205,6 +210,96 @@ impl_ptr_wrapper!(
 );
 
 impl EncoderRef {
+    /// Creates a new, privately owned video encoder of the registered type
+    /// `id` (`obs_video_encoder_create`).
+    ///
+    /// The encoder is not bound to any output or video until
+    /// [`set_video`](Self::set_video) and an output binding are made.
+    pub fn new_video(id: &CStr, name: &CStr, settings: Option<&DataObj<'_>>) -> Result<Self> {
+        let settings = settings.map_or(null_mut(), |data| unsafe { data.as_ptr_mut() });
+        let raw =
+            unsafe { obs_video_encoder_create(id.as_ptr(), name.as_ptr(), settings, null_mut()) };
+        unsafe { Self::from_raw_unchecked(raw) }
+            .ok_or(Error::NulPointer("obs_video_encoder_create"))
+    }
+
+    /// Creates a new, privately owned audio encoder of the registered type
+    /// `id` for audio mixer `mixer_idx` (`obs_audio_encoder_create`).
+    pub fn new_audio(
+        id: &CStr,
+        name: &CStr,
+        settings: Option<&DataObj<'_>>,
+        mixer_idx: usize,
+    ) -> Result<Self> {
+        let settings = settings.map_or(null_mut(), |data| unsafe { data.as_ptr_mut() });
+        let raw = unsafe {
+            obs_audio_encoder_create(id.as_ptr(), name.as_ptr(), settings, mixer_idx, null_mut())
+        };
+        unsafe { Self::from_raw_unchecked(raw) }
+            .ok_or(Error::NulPointer("obs_audio_encoder_create"))
+    }
+
+    /// Returns the kind and codec of the registered encoder type `id`, or
+    /// `None` if no such type is registered.
+    #[allow(non_upper_case_globals)]
+    pub fn registered_type(id: &CStr) -> Option<(EncoderType, CString)> {
+        // obs_get_encoder_type reports audio for unknown ids; the codec
+        // lookup is what distinguishes a registered type.
+        let codec = unsafe { cstring_from_ptr(obs_get_encoder_codec(id.as_ptr())) }?;
+        let kind = match unsafe { obs_get_encoder_type(id.as_ptr()) } {
+            obs_encoder_type_OBS_ENCODER_AUDIO => EncoderType::Audio,
+            obs_encoder_type_OBS_ENCODER_VIDEO => EncoderType::Video,
+            _ => return None,
+        };
+        Some((kind, codec))
+    }
+
+    /// Binds this video encoder to `video` (`obs_encoder_set_video`).
+    ///
+    /// libobs ignores the call while the encoder is active.
+    pub fn set_video(&mut self, video: &VideoRef) {
+        unsafe { obs_encoder_set_video(self.inner, video.pointer) }
+    }
+
+    /// Binds this audio encoder to `audio` (`obs_encoder_set_audio`).
+    ///
+    /// libobs ignores the call while the encoder is active.
+    pub fn set_audio(&mut self, audio: &AudioRef) {
+        unsafe { obs_encoder_set_audio(self.inner, audio.pointer) }
+    }
+
+    /// Requests that libobs convert raw frames to `format` before they
+    /// reach this video encoder.
+    pub fn set_preferred_video_format(&mut self, format: VideoFormat) {
+        unsafe { obs_encoder_set_preferred_video_format(self.inner, format.as_raw()) }
+    }
+
+    /// Returns the sample rate in Hz (audio encoders only).
+    pub fn sample_rate(&self) -> u32 {
+        unsafe { obs_encoder_get_sample_rate(self.inner) }
+    }
+
+    /// Borrows the codec extradata (e.g. H.264 SPS/PPS or the AAC
+    /// AudioSpecificConfig), or returns `None` if the encoder reports none.
+    ///
+    /// # Safety
+    ///
+    /// The bytes are owned by the encoder implementation and are only
+    /// stable while it stays initialized. The encoder must have been
+    /// initialized, and no other party may shut down, reinitialize, update
+    /// or destroy it — including by stopping the last output that uses
+    /// it — while the returned slice is alive.
+    pub unsafe fn extra_data(&self) -> Option<&[u8]> {
+        let mut data = null_mut();
+        let mut size = 0;
+        if !unsafe { obs_encoder_get_extra_data(self.inner, &mut data, &mut size) }
+            || data.is_null()
+        {
+            return None;
+        }
+        Some(unsafe { std::slice::from_raw_parts(data, size) })
+    }
+
     /// Returns the user-visible name of the encoder instance, as set by the
     /// caller of `obs_encoder_create`.
     pub fn name(&self) -> Result<CString> {

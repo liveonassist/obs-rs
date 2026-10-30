@@ -1,18 +1,20 @@
 use std::ffi::{CStr, CString};
 
 use obs_sys_rs::{
-    obs_encoder_t, obs_enum_output_types, obs_enum_outputs, obs_output_active, obs_output_audio,
-    obs_output_begin_data_capture, obs_output_can_begin_data_capture, obs_output_can_pause,
-    obs_output_create, obs_output_end_data_capture, obs_output_force_stop,
-    obs_output_get_audio_encoder, obs_output_get_delay, obs_output_get_frames_dropped,
-    obs_output_get_id, obs_output_get_name, obs_output_get_ref, obs_output_get_service,
-    obs_output_get_total_bytes, obs_output_get_total_frames, obs_output_get_video_encoder,
-    obs_output_initialize_encoders, obs_output_pause, obs_output_paused, obs_output_release,
-    obs_output_set_audio_encoder, obs_output_set_delay, obs_output_set_media,
+    obs_enum_output_types, obs_enum_outputs, obs_get_output_flags, obs_obj_get_data,
+    obs_output_active, obs_output_audio, obs_output_begin_data_capture,
+    obs_output_can_begin_data_capture, obs_output_can_pause, obs_output_create,
+    obs_output_end_data_capture, obs_output_force_stop, obs_output_get_audio_encoder,
+    obs_output_get_delay, obs_output_get_frames_dropped, obs_output_get_id, obs_output_get_name,
+    obs_output_get_ref, obs_output_get_service, obs_output_get_total_bytes,
+    obs_output_get_total_frames, obs_output_get_video_encoder, obs_output_initialize_encoders,
+    obs_output_pause, obs_output_paused, obs_output_release, obs_output_set_audio_encoder,
+    obs_output_set_delay, obs_output_set_media, obs_output_set_reconnect_settings,
     obs_output_set_service, obs_output_set_video_encoder, obs_output_start, obs_output_stop,
     obs_output_t, obs_output_video,
 };
 
+use crate::encoder::EncoderRef;
 use crate::hotkey::HotkeyCallbacks;
 use crate::media::{audio::AudioRef, video::VideoRef};
 use crate::service::context::ServiceRef;
@@ -164,39 +166,58 @@ impl OutputRef {
         unsafe { obs_output_paused(self.inner) }
     }
 
-    /// Binds a video encoder to this output.
+    /// Binds `encoder` as this output's video encoder.
     ///
-    /// # Safety
-    ///
-    /// `encoder` must be a valid `obs_encoder_t*` for which the caller
-    /// retains ownership. The output does not assume ownership of the
-    /// pointer.
-    pub unsafe fn set_video_encoder(&mut self, encoder: *mut obs_encoder_t) {
-        // TODO: later should change *mut obs_encoder_t to something like EncoderContext
-        unsafe { obs_output_set_video_encoder(self.inner, encoder) }
+    /// OBS 30 does not take a reference (OBS 31+ does), so keep `encoder`
+    /// alive for as long as the output should use it. Destroying a bound
+    /// encoder detaches it. libobs ignores the call while the output is
+    /// active.
+    pub fn set_video_encoder(&mut self, encoder: &EncoderRef) {
+        unsafe { obs_output_set_video_encoder(self.inner, encoder.as_ptr_mut()) }
     }
 
-    /// Returns the bound video encoder, or null if none is set.
-    pub fn video_encoder(&self) -> *mut obs_encoder_t {
-        unsafe { obs_output_get_video_encoder(self.inner) }
+    /// Returns a new reference to the bound video encoder, or `None` if
+    /// none is set.
+    pub fn video_encoder(&self) -> Option<EncoderRef> {
+        EncoderRef::from_raw(unsafe { obs_output_get_video_encoder(self.inner) })
     }
 
-    /// Binds an audio encoder to track `idx`.
+    /// Binds `encoder` as this output's audio encoder for track `idx`.
     ///
-    /// # Safety
-    ///
-    /// `encoder` must be a valid `obs_encoder_t*` for which the caller
-    /// retains ownership. The output does not assume ownership of the
-    /// pointer.
-    pub unsafe fn set_audio_encoder(&mut self, encoder: *mut obs_encoder_t, idx: usize) {
-        // TODO: later should change *mut obs_encoder_t to something like EncoderContext
-        unsafe { obs_output_set_audio_encoder(self.inner, encoder, idx as _) }
+    /// OBS 30 does not take a reference (OBS 31+ does), so keep `encoder`
+    /// alive for as long as the output should use it. Destroying a bound
+    /// encoder detaches it. libobs ignores the call while the output is
+    /// active.
+    pub fn set_audio_encoder(&mut self, encoder: &EncoderRef, idx: usize) {
+        unsafe { obs_output_set_audio_encoder(self.inner, encoder.as_ptr_mut(), idx as _) }
     }
 
-    /// Returns the audio encoder bound to track `idx`, or null if none is
-    /// set.
-    pub fn audio_encoder(&self, idx: usize) -> *mut obs_encoder_t {
-        unsafe { obs_output_get_audio_encoder(self.inner, idx as _) }
+    /// Returns a new reference to the audio encoder bound to track `idx`,
+    /// or `None` if none is set.
+    pub fn audio_encoder(&self, idx: usize) -> Option<EncoderRef> {
+        EncoderRef::from_raw(unsafe { obs_output_get_audio_encoder(self.inner, idx as _) })
+    }
+
+    /// Configures automatic reconnection after a network failure.
+    /// `retry_count` of `0` disables reconnection.
+    pub fn set_reconnect_settings(&mut self, retry_count: i32, retry_sec: i32) {
+        unsafe { obs_output_set_reconnect_settings(self.inner, retry_count, retry_sec) }
+    }
+
+    /// Returns the `OBS_OUTPUT_*` flags of the registered output type
+    /// `id`, or `0` if no such type is registered.
+    pub fn registered_flags(id: &CStr) -> u32 {
+        unsafe { obs_get_output_flags(id.as_ptr()) }
+    }
+
+    /// Returns the per-instance data pointer that the output type's
+    /// `create` callback returned, or null if creation produced none.
+    ///
+    /// Only the module that registered the output type knows the pointee's
+    /// type and synchronization; dereferencing it is that module's
+    /// responsibility.
+    pub fn type_data(&self) -> *mut std::ffi::c_void {
+        unsafe { obs_obj_get_data(self.inner.cast()) }
     }
 
     /// Initializes the bound encoders. Returns `true` on success.

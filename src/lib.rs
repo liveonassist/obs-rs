@@ -175,6 +175,8 @@ pub mod media;
 pub mod module;
 /// Bindings for authoring custom OBS outputs.
 pub mod output;
+/// Safe wrappers over libobs's `util/platform.h` helpers.
+pub mod platform;
 /// Builders for the `obs_properties_t` panels OBS renders in plugin
 /// settings dialogs.
 pub mod properties;

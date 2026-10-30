@@ -1,14 +1,14 @@
 use obs_sys_rs::{
-    obs_source_frame, video_data, video_format, video_format_VIDEO_FORMAT_AYUV,
-    video_format_VIDEO_FORMAT_BGR3, video_format_VIDEO_FORMAT_BGRA, video_format_VIDEO_FORMAT_BGRX,
-    video_format_VIDEO_FORMAT_I010, video_format_VIDEO_FORMAT_I40A, video_format_VIDEO_FORMAT_I42A,
-    video_format_VIDEO_FORMAT_I210, video_format_VIDEO_FORMAT_I412, video_format_VIDEO_FORMAT_I420,
-    video_format_VIDEO_FORMAT_I422, video_format_VIDEO_FORMAT_I444, video_format_VIDEO_FORMAT_NONE,
-    video_format_VIDEO_FORMAT_NV12, video_format_VIDEO_FORMAT_P010, video_format_VIDEO_FORMAT_RGBA,
-    video_format_VIDEO_FORMAT_UYVY, video_format_VIDEO_FORMAT_Y800, video_format_VIDEO_FORMAT_YA2L,
-    video_format_VIDEO_FORMAT_YUVA, video_format_VIDEO_FORMAT_YUY2, video_format_VIDEO_FORMAT_YVYU,
-    video_output_get_format, video_output_get_frame_rate, video_output_get_height,
-    video_output_get_width, video_t,
+    obs_get_video, obs_get_video_info, obs_source_frame, obs_video_info, video_data, video_format,
+    video_format_VIDEO_FORMAT_AYUV, video_format_VIDEO_FORMAT_BGR3, video_format_VIDEO_FORMAT_BGRA,
+    video_format_VIDEO_FORMAT_BGRX, video_format_VIDEO_FORMAT_I010, video_format_VIDEO_FORMAT_I40A,
+    video_format_VIDEO_FORMAT_I42A, video_format_VIDEO_FORMAT_I210, video_format_VIDEO_FORMAT_I412,
+    video_format_VIDEO_FORMAT_I420, video_format_VIDEO_FORMAT_I422, video_format_VIDEO_FORMAT_I444,
+    video_format_VIDEO_FORMAT_NONE, video_format_VIDEO_FORMAT_NV12, video_format_VIDEO_FORMAT_P010,
+    video_format_VIDEO_FORMAT_RGBA, video_format_VIDEO_FORMAT_UYVY, video_format_VIDEO_FORMAT_Y800,
+    video_format_VIDEO_FORMAT_YA2L, video_format_VIDEO_FORMAT_YUVA, video_format_VIDEO_FORMAT_YUY2,
+    video_format_VIDEO_FORMAT_YVYU, video_output_get_format, video_output_get_frame_rate,
+    video_output_get_height, video_output_get_width, video_t,
 };
 
 use crate::native_enum;
@@ -246,6 +246,24 @@ impl VideoRef {
     /// Wraps a raw `video_t*`.
     pub fn from_raw(pointer: *mut video_t) -> Self {
         Self { pointer }
+    }
+
+    /// Returns libobs's main video output (`obs_get_video`), or `None`
+    /// before video is initialized.
+    ///
+    /// The handle is borrowed from libobs and is invalidated by a video
+    /// reset or shutdown; it must not be used after either.
+    pub fn main() -> Option<Self> {
+        let pointer = unsafe { obs_get_video() };
+        (!pointer.is_null()).then_some(Self { pointer })
+    }
+
+    /// Returns the core video settings (`obs_get_video_info`), including
+    /// base canvas and scaled output dimensions, or `None` if video is not
+    /// initialized.
+    pub fn main_info() -> Option<obs_video_info> {
+        let mut info = obs_video_info::default();
+        unsafe { obs_get_video_info(&mut info) }.then_some(info)
     }
 
     /// Returns a snapshot of the video output's configuration.
