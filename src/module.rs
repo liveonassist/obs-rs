@@ -229,7 +229,7 @@ macro_rules! obs_register_module {
         #[allow(missing_safety_doc)]
         #[unsafe(no_mangle)]
         pub unsafe extern "C" fn obs_module_ver() -> u32 {
-            $crate::obs_sys_rs::LIBOBS_API_MAJOR_VER
+            $crate::version::Version::COMPILED.to_packed()
         }
 
         #[allow(missing_safety_doc)]
