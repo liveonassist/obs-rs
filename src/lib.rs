@@ -188,6 +188,8 @@ pub mod service;
 pub mod source;
 /// String helpers for interop with OBS C strings.
 pub mod string;
+/// The libobs version a plugin was compiled against and the one it runs in.
+pub mod version;
 
 mod native_enum;
 
