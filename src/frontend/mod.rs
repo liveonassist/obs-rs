@@ -106,11 +106,11 @@ mod event;
 mod lists;
 mod qt;
 
-#[cfg(any(feature = "obs-31", feature = "obs-32"))]
+#[cfg(feature = "obs-32")]
 mod canvas;
 
 pub use callbacks::*;
-#[cfg(any(feature = "obs-31", feature = "obs-32"))]
+#[cfg(feature = "obs-32")]
 pub use canvas::*;
 pub use event::*;
 pub use lists::*;

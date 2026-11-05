@@ -1,5 +1,5 @@
 //! Bulk enumeration of frontend resources: scenes, transitions, scene
-//! collections, profiles, and (on OBS 31+) canvases.
+//! collections, profiles, and (on OBS 32+) canvases.
 //!
 //! The C API exposes these as either:
 //! - `char **` arrays where the entire allocation is a single `bfree`-able

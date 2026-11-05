@@ -1,7 +1,9 @@
-//! OBS 31+ canvas API.
+//! OBS 31.1+ canvas API, available with the `obs-32` feature.
 //!
-//! Canvases are independent video pipelines added in OBS 31. The frontend
-//! API exposes them via [`canvases`] / [`add_canvas`] / [`remove_canvas`].
+//! Canvases are independent video pipelines added in OBS 31.1. The `obs-31`
+//! feature also covers OBS 31.0, whose libobs doesn't export them, and MSVC
+//! rejects unresolved symbols even in unused code. The frontend API exposes
+//! them via [`canvases`] / [`add_canvas`] / [`remove_canvas`].
 
 use std::ffi::CString;
 use std::os::raw::c_void;
